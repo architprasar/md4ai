@@ -128,6 +128,13 @@ export default function App() {
           </div>
           <nav className="app-header__nav" aria-label="Primary">
             <a href="./showcase.html">Showcase</a>
+            <a href="./index.html" style={{
+              color: 'var(--text)',
+              background: 'var(--surface2)',
+              border: '1px solid var(--border)',
+              borderRadius: '9999px',
+              padding: '0.22rem 0.6rem',
+            }}>Playground</a>
             <a href="./docs.html">Docs</a>
             <a href="https://github.com/architprasar/md4ai">GitHub</a>
           </nav>

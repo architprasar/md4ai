@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { parseStreaming } from 'md4ai/core';
+import { renderContent } from 'md4ai/react';
+import { BRIDGES } from './bridges.js';
 
 // ── Shared tokens ─────────────────────────────────────────────────────────────
 
@@ -7,6 +10,7 @@ const SIDEBAR_W = 240;
 const NAV: { label: string; id: string; children?: { label: string; id: string }[] }[] = [
   { label: 'Getting Started', id: 'getting-started' },
   { label: 'Quickstart', id: 'quickstart' },
+  { label: 'Interactive Demos', id: 'interactive-demos' },
   {
     label: 'Syntax', id: 'syntax',
     children: [
@@ -26,6 +30,7 @@ const NAV: { label: string; id: string; children?: { label: string; id: string }
   {
     label: 'Bridge System', id: 'bridges',
     children: [
+      { label: 'Live Bridge Demo', id: 'bridge-demo' },
       { label: 'Define', id: 'bridge-define' },
       { label: 'Patterns', id: 'bridge-patterns' },
       { label: 'Register', id: 'bridge-register' },
@@ -40,6 +45,86 @@ const NAV: { label: string; id: string; children?: { label: string; id: string }
   { label: 'API Reference', id: 'api' },
   { label: 'Why not MDX?', id: 'vs-mdx' },
 ];
+
+const LIVE_DEMOS = {
+  callouts: `> [!NOTE]
+> East region leads this month with the strongest expansion pipeline.
+
+> [!TIP]
+> Reuse the same structure for recommendations and next steps.
+
+> [!WARNING]
+> Mobile parity slipped because API work landed later than planned.`,
+  charts: `\`\`\`chart
+{
+  "type": "bar",
+  "labels": ["North", "South", "East", "West"],
+  "datasets": [
+    {
+      "label": "Pipeline coverage",
+      "data": [124, 91, 147, 109],
+      "backgroundColor": ["#7c3aed", "#7c3aed", "#7c3aed", "#7c3aed"]
+    }
+  ]
+}
+\`\`\``,
+  steps: `\`\`\`steps
+- [done] Confirm the roadmap theme set
+- [active] Ship the AI workspace beta
+  Design partner rollout starts this week.
+- [planned] Publish the mobile recovery plan
+- [planned] Finalize the launch narrative
+\`\`\`
+
+\`\`\`timeline
+Discovery | done
+Implementation | active | Core renderer work is already in review
+QA | planned
+Launch | planned
+\`\`\``,
+  kpis: `::kpi{label="Quarterly Revenue" value="$2.48M" change="+14%" period="QoQ"}
+::kpi{label="Net Retention" value="112%" change="+3 pts" period="YoY"}
+::kpi{label="Launch Confidence" value="78%" change="-4 pts" period="30 days"}`,
+  cards: `:::card{title="Immediate action"}
+Prioritize the mobile parity recovery plan before adding new roadmap scope.
+:::
+
+:::card{title="Leadership note"}
+Reporting foundations are the dependency for three separate launches.
+:::`,
+  layout: `\`\`\`layout columns=2
+### Strengths
+- AI workspace demand is strong
+- Reporting APIs are unblocking multiple teams
+
+---
+
+### Risks
+- Mobile parity is slipping
+- Export job reliability still needs follow-up
+\`\`\``,
+  buttons: `::button[Export roadmap brief]{href="#" variant="primary"}
+::button[Open delivery review]{href="#" variant="secondary"}
+::button[Download CSV]{href="#" variant="default"}
+
+::input{type="text" placeholder="Ask for a deeper breakdown..." label="Follow-up"}`,
+  video: `\`\`\`video
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+\`\`\``,
+  tasks: `- [x] Lock roadmap themes
+- [x] Confirm design partner cohort
+- [ ] Publish mobile recovery milestones
+- [ ] Review launch confidence with engineering leads`,
+  tables: `| Theme | Owner | Confidence | Status |
+| --- | --- | --- | --- |
+| AI Workspace | Product + AI | 82% | On track |
+| Reporting Foundations | Platform | 76% | Active |
+| Mobile Parity | Mobile | 61% | At risk |
+| Total | Product Org | 78% | Stable |`,
+  bridge: `The next release is @release[name: Agent Inbox, status: beta, eta: July 2026, owner: Core UX].
+
+If launch confidence drops, mark it as @release[name: Mobile parity, status: blocked, eta: TBD, owner: Mobile].`,
+};
 
 // ── Code block ────────────────────────────────────────────────────────────────
 
@@ -178,12 +263,149 @@ function Callout({ type, children }: { type: 'note' | 'tip' | 'warning'; childre
   );
 }
 
+function InteractiveDemo({
+  title,
+  description,
+  initial,
+  theme,
+  minHeight = 300,
+}: {
+  title: string;
+  description: string;
+  initial: string;
+  theme: Record<string, string>;
+  minHeight?: number;
+}) {
+  const [source, setSource] = useState(initial);
+
+  const rendered = useMemo(() => {
+    try {
+      return renderContent(parseStreaming(source, { bridges: BRIDGES }), {
+        bridges: BRIDGES,
+        theme,
+      });
+    } catch {
+      return (
+        <div style={{
+          border: '1px solid #fca5a5',
+          background: '#fff1f2',
+          color: '#9f1239',
+          borderRadius: '0.7rem',
+          padding: '0.9rem 1rem',
+          fontSize: '0.84rem',
+        }}>
+          This example did not parse cleanly. Keep editing and the preview will recover automatically.
+        </div>
+      );
+    }
+  }, [source, theme]);
+
+  return (
+    <section className="docs-demo" style={{
+      border: '1px solid var(--border)',
+      background: 'var(--surface)',
+      borderRadius: '1rem',
+      overflow: 'hidden',
+      marginBottom: '1.4rem',
+      boxShadow: '0 18px 40px -30px rgb(15 23 42 / 0.2)',
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '1rem',
+        padding: '0.95rem 1.05rem',
+        borderBottom: '1px solid var(--border)',
+        background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent) 4%, var(--surface)) 0%, var(--surface) 100%)',
+      }}>
+        <div>
+          <strong style={{ display: 'block', fontSize: '0.92rem', letterSpacing: '-0.02em', marginBottom: '0.15rem' }}>{title}</strong>
+          <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.55 }}>{description}</span>
+        </div>
+        <button
+          onClick={() => setSource(initial)}
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '0.5rem',
+            padding: '0.4rem 0.65rem',
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          Reset
+        </button>
+      </div>
+      <div className="docs-demo__grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.95fr) minmax(0, 1.05fr)' }}>
+        <div className="docs-demo__editor" style={{ borderRight: '1px solid var(--border)', minWidth: 0 }}>
+          <div style={{
+            height: 34,
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 0.95rem',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--surface2)',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            color: 'var(--text-muted)',
+          }}>
+            Markdown input
+          </div>
+          <textarea
+            value={source}
+            onChange={(event) => setSource(event.target.value)}
+            spellCheck={false}
+            style={{
+              width: '100%',
+              minHeight,
+              border: 'none',
+              outline: 'none',
+              resize: 'vertical',
+              padding: '1rem',
+              background: 'var(--surface)',
+              color: 'var(--text)',
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: '0.8rem',
+              lineHeight: 1.7,
+            }}
+          />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            height: 34,
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 0.95rem',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--surface2)',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            color: 'var(--text-muted)',
+          }}>
+            Rendered preview
+          </div>
+          <div style={{ padding: '1.15rem', overflowX: 'auto' }}>
+            {rendered}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function DocsPage() {
   const [isDark, setIsDark] = useState(false);
   const [active, setActive] = useState('getting-started');
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const flatNavIds = NAV.flatMap((section) => [section.id, ...(section.children?.map((child) => child.id) ?? [])]);
 
   const bg       = isDark ? '#09090b' : '#ffffff';
   const surface  = isDark ? '#0c0c0f' : '#ffffff';
@@ -191,9 +413,9 @@ export default function DocsPage() {
   const border   = isDark ? '#27272a' : '#e4e4e7';
   const text     = isDark ? '#fafafa' : '#09090b';
   const muted    = isDark ? '#a1a1aa' : '#71717a';
-  const accent   = isDark ? '#a78bfa' : '#7c3aed';
+  const accent   = isDark ? '#e4e4e7' : '#18181b';
   const codeBg   = isDark ? '#18181b' : '#f4f4f5';
-  const codeText = isDark ? '#a78bfa' : '#7c3aed';
+  const codeText = isDark ? '#f4f4f5' : '#18181b';
 
   const cssVars = {
     '--bg': bg, '--surface': surface, '--surface2': surface2,
@@ -201,53 +423,114 @@ export default function DocsPage() {
     '--accent': accent, '--code-bg': codeBg, '--code-text': codeText,
   } as React.CSSProperties;
 
+  const docsTheme = {
+    bg,
+    surface,
+    surface2,
+    border,
+    text,
+    textMuted: muted,
+    accent,
+    accentHover: accent,
+    codeBg,
+    codeText,
+    font: 'Inter, system-ui, sans-serif',
+    mono: 'JetBrains Mono, monospace',
+  };
+
+  const roadmapDemo = `## Product Review
+
+::kpi{label="Launch confidence" value="78%" change="-4 pts" period="This month"}
+::kpi{label="Critical risks" value="3" change="+1" period="Current"}
+
+\`\`\`steps
+- [done] Lock roadmap themes
+- [active] Ship AI workspace beta
+  Design partner rollout starts this week.
+- [planned] Publish mobile recovery plan
+\`\`\`
+
+| Theme | Owner | Status |
+| --- | --- | --- |
+| AI Workspace | Product + AI | On track |
+| Mobile Parity | Mobile | At risk |
+| Admin Controls | Platform | Healthy |`;
+
   useEffect(() => {
-    const obs = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter(e => e.isIntersecting);
-        if (visible.length) setActive(visible[0].target.id);
-      },
-      { rootMargin: '-20% 0px -70% 0px' }
-    );
-    document.querySelectorAll('h2[id], h3[id]').forEach(el => obs.observe(el));
-    return () => obs.disconnect();
-  }, []);
+    const updateActive = () => {
+      const headings = flatNavIds
+        .map((id) => document.getElementById(id))
+        .filter((el): el is HTMLElement => Boolean(el));
+
+      let current = headings[0]?.id ?? 'getting-started';
+      for (const heading of headings) {
+        if (heading.getBoundingClientRect().top <= 120) {
+          current = heading.id;
+        }
+      }
+      setActive(current);
+    };
+
+    updateActive();
+    window.addEventListener('scroll', updateActive, { passive: true });
+    window.addEventListener('resize', updateActive);
+    return () => {
+      window.removeEventListener('scroll', updateActive);
+      window.removeEventListener('resize', updateActive);
+    };
+  }, [flatNavIds]);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', ...cssVars }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', position: 'relative', overflowX: 'hidden', ...cssVars }}>
+      <div style={{
+        position: 'absolute',
+        inset: '0 0 auto',
+        height: 520,
+        pointerEvents: 'none',
+        background: [
+          'radial-gradient(circle at 12% 14%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 26%)',
+          'radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 26%)',
+          'linear-gradient(180deg, color-mix(in srgb, var(--accent) 4%, var(--bg)) 0%, transparent 100%)',
+        ].join(', '),
+      }} />
 
       {/* Top nav */}
-      <header style={{
+      <header className="app-header" style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 1.5rem', height: 52,
         background: `color-mix(in srgb, var(--bg) 85%, transparent)`,
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--border)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <a href="./showcase.html" style={{ fontWeight: 800, fontSize: '1rem', letterSpacing: '-0.04em', color: 'var(--text)', textDecoration: 'none' }}>md4ai</a>
-          <nav style={{ display: 'flex', gap: '1rem' }}>
-            {[['showcase.html', 'Demo'], ['index.html', 'Playground'], ['docs.html', 'Docs']].map(([href, label]) => (
+        <div className="app-header__identity">
+          <div className="app-header__logo">
+            <a href="./showcase.html" className="app-header__logo-text" style={{ textDecoration: 'none' }}>md4ai</a>
+            <span className="app-header__tagline">rich markdown for AI</span>
+          </div>
+          <nav className="app-header__nav" style={{ gap: '1rem' }}>
+            {[['showcase.html', 'Showcase'], ['index.html', 'Playground'], ['docs.html', 'Docs']].map(([href, label]) => (
               <a key={href} href={`./${href}`} style={{
-                fontSize: '0.83rem', fontWeight: href === 'docs.html' ? 600 : 400,
-                color: href === 'docs.html' ? 'var(--accent)' : 'var(--text-muted)',
+                fontSize: '0.83rem', fontWeight: href === 'docs.html' ? 600 : 500,
+                color: href === 'docs.html' ? 'var(--text)' : 'var(--text-muted)',
                 textDecoration: 'none',
+                background: href === 'docs.html' ? 'var(--surface2)' : 'transparent',
+                border: href === 'docs.html' ? '1px solid var(--border)' : '1px solid transparent',
+                borderRadius: '9999px',
+                padding: '0.22rem 0.6rem',
               }}>{label}</a>
             ))}
+            <a href="https://github.com/architprasar/md4ai" style={{
+              fontSize: '0.83rem',
+              fontWeight: 500,
+              color: 'var(--text-muted)',
+              textDecoration: 'none',
+            }}>GitHub</a>
           </nav>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <code style={{
-            fontSize: '0.75rem', fontFamily: 'JetBrains Mono, monospace',
-            background: 'var(--surface2)', border: '1px solid var(--border)',
-            borderRadius: '0.35rem', padding: '0.2rem 0.55rem', color: 'var(--text-muted)',
-          }}>npm install md4ai</code>
-          <button onClick={() => setIsDark(d => !d)} style={{
-            background: 'var(--surface2)', border: '1px solid var(--border)',
-            borderRadius: '0.4rem', padding: '0.3rem 0.7rem',
-            fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-muted)', cursor: 'pointer',
-          }}>{isDark ? 'Light' : 'Dark'}</button>
+        <div className="app-header__actions">
+          <code className="playground-intro__code" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}>npm install md4ai</code>
+          <button onClick={() => setIsDark(d => !d)} className="btn-icon">
+            {isDark ? 'Light' : 'Dark'}
+          </button>
         </div>
       </header>
 
@@ -258,36 +541,72 @@ export default function DocsPage() {
           position: 'fixed', top: 52, bottom: 0, left: 0,
           width: SIDEBAR_W, overflowY: 'auto',
           borderRight: '1px solid var(--border)',
-          background: 'var(--surface)',
-          padding: '1.5rem 0',
+          background: 'color-mix(in srgb, var(--surface) 94%, transparent)',
+          padding: '1.1rem 0.85rem 1.5rem',
         }}>
-          {NAV.map(section => (
-            <div key={section.id} style={{ marginBottom: '0.25rem' }}>
+          {NAV.map(section => {
+            const sectionActive = active === section.id || Boolean(section.children?.some((child) => child.id === active));
+            return (
+            <div key={section.id} style={{
+              marginBottom: '0.5rem',
+              border: '1px solid',
+              borderColor: sectionActive ? 'color-mix(in srgb, var(--accent) 16%, var(--border))' : 'transparent',
+              borderRadius: '0.95rem',
+              background: sectionActive ? 'color-mix(in srgb, var(--accent) 4%, var(--surface))' : 'transparent',
+              padding: '0.3rem 0',
+            }}>
               <a
                 href={`#${section.id}`}
                 style={{
-                  display: 'block', padding: '0.3rem 1.25rem',
-                  fontSize: '0.82rem', fontWeight: active === section.id ? 600 : 500,
-                  color: active === section.id ? 'var(--accent)' : 'var(--text)',
+                  display: 'block', padding: '0.42rem 0.9rem',
+                  fontSize: '0.82rem', fontWeight: sectionActive ? 700 : 600,
+                  color: sectionActive ? 'var(--text)' : 'var(--text)',
                   textDecoration: 'none',
-                  background: active === section.id ? `color-mix(in srgb, var(--accent) 8%, var(--surface))` : 'none',
-                  borderRight: active === section.id ? `2px solid var(--accent)` : '2px solid transparent',
+                  letterSpacing: '-0.01em',
                 }}
               >{section.label}</a>
-              {section.children?.map(child => (
+              {section.children && (
+                <div style={{
+                  display: 'grid',
+                  gap: '0.15rem',
+                  marginTop: '0.1rem',
+                  padding: '0.1rem 0.35rem 0.35rem',
+                }}>
+              {section.children.map(child => (
                 <a
                   key={child.id}
                   href={`#${child.id}`}
                   style={{
-                    display: 'block', padding: '0.25rem 1.25rem 0.25rem 2.25rem',
-                    fontSize: '0.78rem', fontWeight: active === child.id ? 600 : 400,
-                    color: active === child.id ? 'var(--accent)' : 'var(--text-muted)',
+                    display: 'block',
+                    padding: '0.38rem 0.55rem 0.38rem 1rem',
+                    fontSize: '0.77rem',
+                    fontWeight: active === child.id ? 700 : 500,
+                    color: active === child.id ? 'var(--text)' : 'var(--text-muted)',
                     textDecoration: 'none',
+                    borderRadius: '0.7rem',
+                    background: active === child.id ? 'var(--surface)' : 'transparent',
+                    boxShadow: active === child.id ? '0 1px 2px 0 rgb(0 0 0 / 0.05)' : 'none',
+                    border: active === child.id ? '1px solid var(--border)' : '1px solid transparent',
+                    position: 'relative',
                   }}
-                >{child.label}</a>
+                >
+                  <span style={{
+                    position: 'absolute',
+                    left: '0.45rem',
+                    top: '50%',
+                    width: 5,
+                    height: 5,
+                    marginTop: -2.5,
+                    borderRadius: '50%',
+                    background: active === child.id ? 'var(--accent)' : 'var(--border)',
+                  }} />
+                  {child.label}
+                </a>
               ))}
+                </div>
+              )}
             </div>
-          ))}
+          )})}
         </aside>
 
         {/* Content */}
@@ -296,41 +615,47 @@ export default function DocsPage() {
           flex: 1, maxWidth: 740,
           padding: '3rem 3rem 8rem',
           minWidth: 0,
+          position: 'relative',
         }}>
 
-          <section style={{
-            border: '1px solid var(--border)',
-            background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent) 4%, var(--surface)) 0%, var(--surface) 100%)',
-            borderRadius: '1rem',
-            padding: '1.5rem 1.6rem',
-            marginBottom: '2rem',
-          }}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              borderRadius: '9999px',
-              padding: '0.22rem 0.7rem',
-              border: '1px solid color-mix(in srgb, var(--accent) 18%, var(--border))',
-              color: 'var(--accent)',
-              background: 'color-mix(in srgb, var(--accent) 8%, var(--surface))',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              marginBottom: '1rem',
-            }}>Open source runtime markdown renderer</div>
-            <h1 style={{ fontSize: '2rem', lineHeight: 1.05, letterSpacing: '-0.05em', marginBottom: '0.85rem' }}>
-              Build rich AI response UIs without forcing models to emit JSON.
-            </h1>
-            <P>Use the parser from <IC>md4ai/core</IC>, render with <IC>md4ai/react</IC>, and keep your app in plain markdown all the way through streaming.</P>
-            <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-              <a href="./showcase.html" style={{ textDecoration: 'none', color: 'white', background: 'var(--accent)', padding: '0.55rem 0.95rem', borderRadius: '0.6rem', fontSize: '0.85rem', fontWeight: 600 }}>Open live demo</a>
-              <a href="./index.html" style={{ textDecoration: 'none', color: 'var(--text)', background: 'var(--surface)', border: '1px solid var(--border)', padding: '0.55rem 0.95rem', borderRadius: '0.6rem', fontSize: '0.85rem', fontWeight: 600 }}>Open playground</a>
-              <a href="https://github.com/architprasar/md4ai" style={{ textDecoration: 'none', color: 'var(--text-muted)', background: 'var(--surface)', border: '1px solid var(--border)', padding: '0.55rem 0.95rem', borderRadius: '0.6rem', fontSize: '0.85rem', fontWeight: 600 }}>GitHub</a>
-            </div>
-            <Code lang="tsx">{`import { parse, parseStreaming, defineBridge } from 'md4ai/core';
+          <section className="playground-intro" style={{ marginBottom: '2rem', border: '1px solid var(--border)', borderRadius: '1rem' }}>
+            <div className="playground-intro__copy">
+              <span className="playground-intro__eyebrow">Docs</span>
+              <h1>Build rich AI response UIs without forcing models to emit JSON.</h1>
+              <p>Use the parser from <IC>md4ai/core</IC>, render with <IC>md4ai/react</IC>, and keep your app in plain markdown all the way through streaming.</p>
+              <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                <a href="./showcase.html" className="btn-icon btn-icon--active" style={{ textDecoration: 'none' }}>Open live demo</a>
+                <a href="./index.html" className="btn-icon" style={{ textDecoration: 'none' }}>Open playground</a>
+                <a href="https://github.com/architprasar/md4ai" className="btn-icon" style={{ textDecoration: 'none' }}>GitHub</a>
+              </div>
+              <Code lang="tsx">{`import { parse, parseStreaming, defineBridge } from 'md4ai/core';
 import { renderContent, themes } from 'md4ai/react';`}</Code>
+            </div>
+            <div className="playground-intro__meta">
+              {[
+                ['Runtime-first', 'Stream markdown directly from your model without converting everything into JSON first.'],
+                ['Composable UI', 'Mix plain markdown with KPIs, charts, steps, tables, cards, and your own bridge components.'],
+                ['Production-ready', 'Graceful fallback behavior keeps partial or malformed content from breaking the message UI.'],
+              ].map(([title, copy]) => (
+                <div key={title} className="playground-stat">
+                  <strong>{title}</strong>
+                  <span>{copy}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="sample-rail" style={{ marginBottom: '2rem', border: '1px solid var(--border)', borderRadius: '1rem' }}>
+            {[
+              ['Start here', 'Read the quickstart and then edit the live examples below.'],
+              ['Best for', 'Chat UIs, dashboards, agent tools, reports, and internal ops surfaces.'],
+              ['Core split', '`md4ai/core` parses and `md4ai/react` renders with shared bridges.'],
+            ].map(([title, copy]) => (
+              <div key={title} className="sample-chip" style={{ minWidth: 0, flex: 1, cursor: 'default' }}>
+                <span className="sample-chip__label">{title}</span>
+                <span className="sample-chip__description">{copy}</span>
+              </div>
+            ))}
           </section>
 
           {/* ── Getting Started ── */}
@@ -375,6 +700,16 @@ function StreamingMessage({ text }: { text: string }) {
             ]}
           />
 
+          <H2 id="interactive-demos">Interactive Demos</H2>
+          <P>These blocks are editable. Change the markdown on the left and watch the preview update on the right using the same parser and renderer you would use in an app.</P>
+
+          <InteractiveDemo
+            title="Roadmap and reporting primitives"
+            description="Try KPI blocks, steps, and tables together in a realistic product-review message."
+            initial={roadmapDemo}
+            theme={docsTheme}
+          />
+
           {/* ── Syntax ── */}
           <H2 id="syntax">Syntax Reference</H2>
           <P>All standard markdown is supported — headings, bold, italic, links, images, blockquotes, tables, code blocks, horizontal rules, and GFM task lists. The following extensions are added on top.</P>
@@ -405,6 +740,13 @@ function StreamingMessage({ text }: { text: string }) {
               ['<code>DANGER</code>', 'Red', 'Critical issues, blockers'],
             ]}
           />
+          <InteractiveDemo
+            title="Live callout demo"
+            description="Edit GitHub-style alert markdown and watch md4ai render the richer callout UI."
+            initial={LIVE_DEMOS.callouts}
+            theme={docsTheme}
+            minHeight={210}
+          />
 
           <H3 id="charts">Charts</H3>
           <P>Fenced code block with <IC>chart</IC> lang. Uses Chart.js under the hood — install it separately. During streaming, an animated skeleton placeholder renders until the JSON is complete (no raw JSON flash).</P>
@@ -423,6 +765,13 @@ function StreamingMessage({ text }: { text: string }) {
 \`\`\``}</Code>
           <P>Supported types: <IC>bar</IC> <IC>line</IC> <IC>pie</IC> <IC>doughnut</IC> <IC>radar</IC></P>
           <Callout type="note">chart.js must be installed separately: <IC>npm install chart.js</IC>. If it is missing, chart fences render as a skeleton placeholder.</Callout>
+          <InteractiveDemo
+            title="Live chart demo"
+            description="Paste different datasets or switch the chart type to see how the fence renders."
+            initial={LIVE_DEMOS.charts}
+            theme={docsTheme}
+            minHeight={260}
+          />
 
           <H3 id="steps">Steps and Timelines</H3>
           <P>Use <IC>steps</IC> or <IC>timeline</IC> fences for AI-generated workflows, plans, and progress reports. The parser accepts a few forgiving formats so models do not need to memorize a rigid schema.</P>
@@ -441,6 +790,13 @@ QA | planned
 Launch: planned
 \`\`\``}</Code>
           <P>Accepted forms include <IC>[done] Title</IC>, <IC>Title [done]</IC>, <IC>done: Title</IC>, <IC>Title: planned</IC>, and <IC>Title | active | detail</IC>. If a status is missing or malformed, the step still renders as <IC>planned</IC>.</P>
+          <InteractiveDemo
+            title="Live steps and timeline demo"
+            description="Try the forgiving status formats and see how partial plans still render cleanly."
+            initial={LIVE_DEMOS.steps}
+            theme={docsTheme}
+            minHeight={280}
+          />
 
           <H3 id="kpi-metrics">KPI Metrics</H3>
           <P>Use <IC>::kpi</IC> for a first-class metric block. It is compact enough for model output, but still readable as plain text when rendered as raw markdown.</P>
@@ -448,6 +804,13 @@ Launch: planned
 ::kpi{label="Net Retention" value="108%" change="+4 pts" period="YoY"}
 ::kpi{label="South Region" value="$98k" change="-7%" period="QoQ"}`}</Code>
           <P><IC>label</IC> and <IC>value</IC> are the main fields. <IC>change</IC> and <IC>period</IC> are optional metadata rendered as trend and badge UI.</P>
+          <InteractiveDemo
+            title="Live KPI demo"
+            description="Tune labels, values, deltas, and periods to see how the metric cards adapt."
+            initial={LIVE_DEMOS.kpis}
+            theme={docsTheme}
+            minHeight={220}
+          />
 
           <H3 id="cards">Cards</H3>
           <Code>{`:::card{title="Immediate action"}
@@ -457,6 +820,13 @@ Schedule a call with South region AEs. Pull exit survey data first.
 :::card{title="This quarter"}
 Allocate 2 APAC AE headcount. East momentum is self-sustaining.
 :::`}</Code>
+          <InteractiveDemo
+            title="Live card demo"
+            description="Good for action summaries, highlights, and concise AI-generated recommendations."
+            initial={LIVE_DEMOS.cards}
+            theme={docsTheme}
+            minHeight={220}
+          />
 
           <H3 id="layout">Multi-column Layout</H3>
           <P>Sections are separated by <IC>---</IC> within the fence. Defaults to 2 columns.</P>
@@ -471,6 +841,13 @@ Allocate 2 APAC AE headcount. East momentum is self-sustaining.
 - South SMB churn accelerating
 - West pipeline coverage thin
 \`\`\``}</Code>
+          <InteractiveDemo
+            title="Live layout demo"
+            description="Turn one markdown block into a balanced multi-column summary section."
+            initial={LIVE_DEMOS.layout}
+            theme={docsTheme}
+            minHeight={250}
+          />
 
           <H3 id="buttons">Buttons</H3>
           <Code>{`::button[Export Report]{href="#" variant="primary"}
@@ -484,6 +861,13 @@ Allocate 2 APAC AE headcount. East momentum is self-sustaining.
               ['<code>default</code>', 'Surface2 with border'],
             ]}
           />
+          <InteractiveDemo
+            title="Live buttons and input demo"
+            description="Test action bars and lightweight form prompts inside the same markdown response."
+            initial={LIVE_DEMOS.buttons}
+            theme={docsTheme}
+            minHeight={230}
+          />
 
           <H3 id="inputs">Inputs</H3>
           <Code>{`::input{type="text" placeholder="Ask a follow-up..." label="Follow-up"}
@@ -494,6 +878,13 @@ Allocate 2 APAC AE headcount. East momentum is self-sustaining.
           <Code>{`\`\`\`video
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
 \`\`\``}</Code>
+          <InteractiveDemo
+            title="Live video demo"
+            description="Swap in a YouTube, Vimeo, or direct video URL to see the renderer choose the right player."
+            initial={LIVE_DEMOS.video}
+            theme={docsTheme}
+            minHeight={180}
+          />
 
           <H3 id="task-lists">Task Lists</H3>
           <P>Standard GFM syntax — rendered with visual checkboxes.</P>
@@ -501,6 +892,13 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
 - [x] Identify top churned accounts
 - [ ] Schedule South region review call
 - [ ] Draft Q2 forecast model`}</Code>
+          <InteractiveDemo
+            title="Live task list demo"
+            description="Useful for operational checklists, launch criteria, and agent follow-up work."
+            initial={LIVE_DEMOS.tasks}
+            theme={docsTheme}
+            minHeight={190}
+          />
 
           <H3 id="tables">Tables</H3>
           <P>Standard GFM tables are supported directly. The built-in renderer improves them for report-style content by right-aligning mostly numeric columns, tightening dense layouts, emphasizing summary rows like <IC>Total</IC> and <IC>Average</IC>, and giving simple status or delta cells stronger visual cues.</P>
@@ -520,6 +918,13 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
               ['Horizontal overflow handling', 'Tables remain usable on smaller screens'],
             ]}
           />
+          <InteractiveDemo
+            title="Live table demo"
+            description="Edit analytics-style tables and watch numeric alignment and summary-row emphasis kick in."
+            initial={LIVE_DEMOS.tables}
+            theme={docsTheme}
+            minHeight={220}
+          />
 
           {/* ── Bridges ── */}
           <H2 id="bridges">Bridge System</H2>
@@ -528,6 +933,36 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
           <Callout type="tip">
             <IC>@</IC> only fires as a bridge marker when followed by <IC>word[</IC>. Bare mentions like <IC>@john</IC> and emails like <IC>user@company.com</IC> are never matched — the bracket requirement is the disambiguator.
           </Callout>
+
+          <H3 id="bridge-demo">Live bridge demo</H3>
+          <P>The docs demo includes a custom bridge called <IC>release</IC>. It renders roadmap-style badges from a compact inline marker, which is a good example of how teams can teach md4ai about product-specific components.</P>
+          <Table
+            head={['Piece', 'Example']}
+            rows={[
+              ['Marker syntax', '<code>@release[name: Agent Inbox, status: beta, eta: July 2026, owner: Core UX]</code>'],
+              ['Pattern', '<code>keyvalue</code>'],
+              ['Best use', 'Roadmap chips, launch badges, release summaries, ownership metadata'],
+            ]}
+          />
+          <Code lang="tsx">{`const releaseBridge = defineBridge({
+  marker: 'release',
+  pattern: 'keyvalue',
+  render: ({ name, status, eta, owner }) => (
+    <ReleaseBadge
+      name={name}
+      status={status}
+      eta={eta}
+      owner={owner}
+    />
+  ),
+});`}</Code>
+          <InteractiveDemo
+            title="Live bridge demo"
+            description="This docs page ships a demo-only @release[...] bridge so you can edit the marker syntax and preview the custom component immediately."
+            initial={LIVE_DEMOS.bridge}
+            theme={docsTheme}
+            minHeight={220}
+          />
 
           <H3 id="bridge-define">Define a bridge</H3>
           <Code lang="tsx">{`import { defineBridge } from 'md4ai/core';
@@ -818,6 +1253,8 @@ for await (const chunk of stream) {
         @media (max-width: 768px) {
           aside { display: none; }
           main { margin-left: 0 !important; padding: 2rem 1.25rem 4rem !important; }
+          .docs-demo__grid { grid-template-columns: 1fr !important; }
+          .docs-demo__editor { border-right: none !important; border-bottom: 1px solid var(--border); }
         }
       `}</style>
     </div>

@@ -295,4 +295,60 @@ export const paymentBridge = defineBridge<Record<string, string>>({
   },
 });
 
-export const BRIDGES = [kpiBridge, sparklineBridge, timelineBridge, paymentBridge];
+export const releaseBridge = defineBridge<Record<string, string>>({
+  marker: 'release',
+  pattern: 'keyvalue',
+  prompt: 'Use @release[name: Feature, status: beta, eta: Jul 2026, owner: Platform] to show a small release badge card inline.',
+  render: ({ name, status, eta, owner }) => {
+    const normalized = (status ?? 'planned').trim().toLowerCase();
+    const tone = normalized === 'live'
+      ? { fg: '#166534', bg: '#dcfce7', border: '#86efac' }
+      : normalized === 'beta'
+        ? { fg: '#1d4ed8', bg: '#dbeafe', border: '#93c5fd' }
+        : normalized === 'blocked'
+          ? { fg: '#b91c1c', bg: '#fee2e2', border: '#fca5a5' }
+          : { fg: '#6b21a8', bg: '#f3e8ff', border: '#d8b4fe' };
+
+    return (
+      <span style={{
+        display: 'inline-flex',
+        alignItems: 'stretch',
+        gap: '0.75rem',
+        padding: '0.75rem 0.9rem',
+        borderRadius: '0.9rem',
+        border: `1px solid ${tone.border}`,
+        background: 'var(--surface)',
+        boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.08)',
+        verticalAlign: 'middle',
+        margin: '0.2rem 0',
+      }}>
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: 58,
+          borderRadius: '0.65rem',
+          background: tone.bg,
+          color: tone.fg,
+          fontSize: '0.68rem',
+          fontWeight: 800,
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          padding: '0 0.55rem',
+        }}>
+          {normalized}
+        </span>
+        <span style={{ display: 'inline-flex', flexDirection: 'column', gap: '0.16rem' }}>
+          <span style={{ fontSize: '0.86rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)' }}>
+            {name ?? 'Release'}
+          </span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+            {[owner ? `Owner: ${owner}` : null, eta ? `ETA: ${eta}` : null].filter(Boolean).join(' · ') || 'Tracked in roadmap'}
+          </span>
+        </span>
+      </span>
+    );
+  },
+});
+
+export const BRIDGES = [kpiBridge, sparklineBridge, timelineBridge, paymentBridge, releaseBridge];

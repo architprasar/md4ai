@@ -68,7 +68,7 @@ function useStream(full: string) {
 
 export default function ShowcasePage() {
   const [isDark, setIsDark] = useState(false);
-  const theme = themes.violet[isDark ? 'dark' : 'light'];
+  const theme = themes.zinc[isDark ? 'dark' : 'light'];
   const { text, done, replay } = useStream(SHOWCASE_CONTENT);
 
   const cssVars = useMemo(() => ({
@@ -105,32 +105,52 @@ export default function ShowcasePage() {
           ].join(', '),
         }}
       />
-      <nav style={{
-        position: 'sticky', top: 0, zIndex: 50,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 2rem', height: 52,
+      <nav className="app-header" style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '1rem',
+        minHeight: 52,
+        padding: '0 1.25rem',
         background: 'color-mix(in srgb, var(--bg) 82%, transparent)',
-        backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)',
+        backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid var(--border)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ fontWeight: 800, fontSize: '1rem', letterSpacing: '-0.04em' }}>md4ai</span>
-          <div style={{ display: 'flex', gap: '0.9rem', fontSize: '0.82rem' }}>
-            <a href="./docs.html" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Docs</a>
+        <div className="app-header__identity" style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 }}>
+          <div className="app-header__logo" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span className="app-header__logo-text" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em' }}>md4ai</span>
+            <span className="app-header__tagline" style={{
+              fontSize: '0.7rem',
+              color: 'var(--text-muted)',
+              background: 'var(--surface2)',
+              border: '1px solid var(--border)',
+              padding: '0.15rem 0.5rem',
+              borderRadius: '9999px',
+              letterSpacing: '0.01em',
+            }}>rich markdown for AI</span>
+          </div>
+          <div className="app-header__nav" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.82rem' }}>
+            <a href="./showcase.html" style={{
+              color: 'var(--text)',
+              textDecoration: 'none',
+              background: 'var(--surface2)',
+              border: '1px solid var(--border)',
+              borderRadius: '9999px',
+              padding: '0.22rem 0.6rem',
+            }}>Showcase</a>
             <a href="./index.html" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Playground</a>
+            <a href="./docs.html" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Docs</a>
             <a href="https://github.com/architprasar/md4ai" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>GitHub</a>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <a href="./index.html" style={{
-            fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-muted)',
-            textDecoration: 'none', padding: '0.3rem 0.7rem',
-            border: '1px solid var(--border)', borderRadius: '0.4rem',
-          }}>Dev tool →</a>
-          <button onClick={() => setIsDark(d => !d)} style={{
-            background: 'var(--surface2)', border: '1px solid var(--border)',
-            borderRadius: '0.4rem', padding: '0.3rem 0.7rem',
-            fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-muted)', cursor: 'pointer',
-          }}>{isDark ? 'Light' : 'Dark'}</button>
+        <div className="app-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <a href="./index.html" className="btn-icon" style={{ textDecoration: 'none' }}>Dev tool →</a>
+          <button onClick={() => setIsDark(d => !d)} className="btn-icon">
+            {isDark ? 'Light' : 'Dark'}
+          </button>
         </div>
       </nav>
 
