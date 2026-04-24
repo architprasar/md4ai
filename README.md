@@ -445,21 +445,6 @@ import { themes } from 'md4ai';
 
 ---
 
-## Why not MDX?
-
-| | MDX | md4ai |
-|--|-----|-------|
-| Requires build step | Yes | No — pure runtime |
-| AI must write JSX | Yes — breaks constantly | No — plain markdown |
-| Streaming support | No | Yes |
-| Custom components | Import in file | `defineBridge` + one prompt line |
-| Readable without renderer | No | Yes — degrades to plain text |
-| Works in any React app | Needs bundler config | Drop-in |
-
-MDX is the right tool when humans author content at build time. md4ai is the right tool when AI generates content at runtime and readability without the renderer matters.
-
----
-
 ## License
 
 MIT
