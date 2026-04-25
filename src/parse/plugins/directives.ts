@@ -2,11 +2,30 @@ import { visit } from 'unist-util-visit';
 import type { Root } from 'mdast';
 import type { Plugin } from 'unified';
 
+interface DirectiveChild {
+  type?: string;
+  value?: string;
+  children?: DirectiveChild[];
+  [key: string]: unknown;
+}
+
 interface DirectiveNode {
   type: string;
   name: string;
-  children?: Array<{ value?: string; [key: string]: unknown }>;
+  children?: DirectiveChild[];
   attributes?: Record<string, string>;
+}
+
+/** Walk the remark-directive child tree and collect all text leaf values. */
+function extractText(nodes: DirectiveChild[] | undefined): string {
+  if (!nodes) return '';
+  return nodes
+    .map((child) =>
+      child.type === 'text' && typeof child.value === 'string'
+        ? child.value
+        : extractText(child.children as DirectiveChild[] | undefined),
+    )
+    .join('');
 }
 
 const plugin: Plugin<[], Root> = () => (tree) => {
@@ -17,10 +36,7 @@ const plugin: Plugin<[], Root> = () => (tree) => {
     let richNode: unknown;
 
     if (n.name === 'button') {
-      const label =
-        n.children && n.children.length > 0
-          ? n.children[0].value ?? ''
-          : '';
+      const label = extractText(n.children);
       richNode = {
         type: 'button',
         data: {

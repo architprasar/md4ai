@@ -14,7 +14,9 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "paths": {
-      "md4ai": ["../../src/index.ts"]
+      "@architprasar/md4ai": ["../../src/index.ts"],
+      "@architprasar/md4ai/core": ["../../src/core.ts"],
+      "@architprasar/md4ai/react": ["../../src/react.ts"]
     }
   },
   "include": ["src"]

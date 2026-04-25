@@ -1,5 +1,5 @@
 {
-  "name": "md4ai",
+  "name": "@architprasar/md4ai",
   "version": "0.1.0",
   "description": "AI-friendly rich markdown renderer — extended markdown syntax that renders to interactive UI",
   "type": "module",
@@ -38,6 +38,17 @@
     "react",
     "rich-text"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/architprasar/md4ai.git"
+  },
+  "homepage": "https://github.com/architprasar/md4ai#readme",
+  "bugs": {
+    "url": "https://github.com/architprasar/md4ai/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT",
   "peerDependencies": {
     "react": ">=18",

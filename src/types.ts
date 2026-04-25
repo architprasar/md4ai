@@ -67,8 +67,27 @@ export interface ParseOptions {
   /** Enable GFM (tables, task lists, strikethrough). Default: true */
   gfm?: boolean;
   /** Registered bridges — teaches the parser which @marker[data] tokens to recognize */
-  bridges?: BridgeDefinition[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  bridges?: BridgeDefinition<any>[];
 }
+
+/** Single source of truth: theme key → CSS custom property name */
+export const THEME_KEYS = {
+  accent: '--accent',
+  accentHover: '--accent-hover',
+  text: '--text',
+  textMuted: '--text-muted',
+  surface: '--surface',
+  surface2: '--surface2',
+  bg: '--bg',
+  border: '--border',
+  codeBg: '--code-bg',
+  codeText: '--code-text',
+  font: '--font',
+  mono: '--mono',
+} as const;
+
+export type ThemeTokenKey = keyof typeof THEME_KEYS;
 
 export interface RenderContentOptions {
   /** Extra CSS class on the root wrapper element */
@@ -82,24 +101,12 @@ export interface RenderContentOptions {
    * CSS variable overrides scoped to the root wrapper.
    * Keys map to the library's CSS custom properties.
    */
-  theme?: Partial<{
-    accent: string;
-    accentHover: string;
-    text: string;
-    textMuted: string;
-    surface: string;
-    surface2: string;
-    bg: string;
-    border: string;
-    codeBg: string;
-    codeText: string;
-    font: string;
-    mono: string;
-  }>;
+  theme?: Partial<Record<ThemeTokenKey, string>>;
   /** Replace specific node renderers with your own components */
   components?: ComponentOverrides;
   /** Registered bridges — maps @marker[data] tokens to components at render time */
-  bridges?: BridgeDefinition[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  bridges?: BridgeDefinition<any>[];
   /** Provide data to bridge render functions via query(key, params) */
   store?: Record<string, (params?: unknown) => unknown>;
   /** Handle events emitted by bridge components */

@@ -1,6 +1,8 @@
 import React from 'react';
 import type { IRNode, RenderContentOptions } from '../../types.js';
+import { THEME_KEYS } from '../../types.js';
 import { RenderContext, useRenderCtx } from './context.js';
+import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { Inline } from './components/Inline.js';
 import { Callout } from './components/Callout.js';
 import { Chart } from './components/Chart.js';
@@ -13,32 +15,25 @@ import { Layout } from './components/Layout.js';
 import { Steps } from './components/Steps.js';
 import { Table } from './components/Table.js';
 
-const THEME_VAR_MAP: Record<string, string> = {
-  accent: '--accent',
-  accentHover: '--accent-hover',
-  text: '--text',
-  textMuted: '--text-muted',
-  surface: '--surface',
-  surface2: '--surface2',
-  bg: '--bg',
-  border: '--border',
-  codeBg: '--code-bg',
-  codeText: '--code-text',
-  font: '--font',
-  mono: '--mono',
-};
-
 function themeToStyle(theme: RenderContentOptions['theme']): React.CSSProperties {
   if (!theme) return {};
   return Object.fromEntries(
     Object.entries(theme)
       .filter(([, v]) => v != null)
-      .map(([k, v]) => [THEME_VAR_MAP[k] ?? `--${k}`, v])
+      .map(([k, v]) => [THEME_KEYS[k as keyof typeof THEME_KEYS] ?? `--${k}`, v])
   ) as React.CSSProperties;
 }
 
 export function RenderNodes({ nodes }: { nodes: IRNode[] }) {
-  return <>{nodes.map((n, i) => <RenderNode key={i} node={n} />)}</>;
+  return (
+    <>
+      {nodes.map((n, i) => (
+        <ErrorBoundary key={i}>
+          <RenderNode node={n} />
+        </ErrorBoundary>
+      ))}
+    </>
+  );
 }
 
 export function RenderNode({ node }: { node: IRNode }) {
@@ -46,6 +41,11 @@ export function RenderNode({ node }: { node: IRNode }) {
 
   switch (node.type) {
     case 'paragraph': {
+      // A paragraph containing only a single bridge node renders as a block without
+      // a <p> wrapper — bridges are block-level UI, not phrasing content.
+      if (node.children.length === 1 && node.children[0].type === 'bridge') {
+        return <Inline nodes={node.children} />;
+      }
       const rendered = <Inline nodes={node.children} />;
       if (C.paragraph) return C.paragraph({ children: rendered });
       return <p className="md4ai-p">{rendered}</p>;

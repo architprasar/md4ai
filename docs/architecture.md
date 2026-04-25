@@ -12,9 +12,9 @@
 
 The package now exposes that split directly:
 
-- `md4ai/core` for parsing, streaming, bridges, and IR types
-- `md4ai/react` for `renderContent()`, themes, and renderer override types
-- `md4ai` as the compatibility entry that re-exports both
+- `@architprasar/md4ai/core` for parsing, streaming, bridges, and IR types
+- `@architprasar/md4ai/react` for `renderContent()`, themes, and renderer override types
+- `@architprasar/md4ai` as the compatibility entry that re-exports both
 
 The renderer intentionally separates parsing from presentation:
 

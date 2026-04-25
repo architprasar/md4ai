@@ -7,8 +7,8 @@ This guide focuses on the operational side of `md4ai`: how to stream safely, lay
 Use `parseStreaming()` on the full accumulated response text every time a new chunk arrives:
 
 ```tsx
-import { parseStreaming } from 'md4ai/core';
-import { renderContent } from 'md4ai/react';
+import { parseStreaming } from '@architprasar/md4ai/core';
+import { renderContent } from '@architprasar/md4ai/react';
 
 function AssistantMessage({ text }: { text: string }) {
   return renderContent(parseStreaming(text));
@@ -33,7 +33,7 @@ Recommended app pattern:
 `renderContent()` scopes theme tokens to the wrapper it returns, so the safest production path is to derive your app shell and `md4ai` from the same token object:
 
 ```tsx
-import { renderContent, themes } from 'md4ai/react';
+import { renderContent, themes } from '@architprasar/md4ai/react';
 
 const theme = themes.blue.dark;
 

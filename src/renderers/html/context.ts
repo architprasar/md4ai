@@ -1,12 +1,12 @@
 import { createContext, useContext } from 'react';
-import type { ComponentOverrides, RenderHTMLOptions } from '../../types.js';
+import type { ComponentOverrides, RenderContentOptions } from '../../types.js';
 import type { BridgeDefinition, BridgeRenderCtx } from '../../bridge.js';
 
 export interface RenderCtx {
   className?: string;
-  theme?: RenderHTMLOptions['theme'];
+  theme?: RenderContentOptions['theme'];
   components: ComponentOverrides;
-  highlight?: RenderHTMLOptions['highlight'];
+  highlight?: RenderContentOptions['highlight'];
   bridges: BridgeDefinition[];
   bridgeCtx: BridgeRenderCtx;
 }

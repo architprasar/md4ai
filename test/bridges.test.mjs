@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { defineBridge, parse, parseBridgeData, renderContent } from '../.test-dist/test/entry.js';
+import { builtinPromptTopics, defineBridge, getBridgePrompt, getPrompt, parse, parseBridgeData, renderContent } from '../.test-dist/test/entry.js';
 
 test('parse resolves registered bridges using their declared pattern', () => {
   const statusBridge = defineBridge({
@@ -111,6 +111,143 @@ test('defineBridge rejects invalid marker names up front', () => {
     pattern: 'scalar',
     render: () => null,
   }), /Invalid bridge marker/);
+});
+
+test('getBridgePrompt builds a combined bridge prompt string', () => {
+  const statusBridge = defineBridge({
+    marker: 'status',
+    pattern: 'scalar',
+    render: () => null,
+  });
+  const badgeBridge = defineBridge({
+    marker: 'badge',
+    pattern: 'scalar',
+    render: () => null,
+  });
+
+  const prompt = getBridgePrompt([statusBridge, badgeBridge], {
+    prefix: 'You may use these inline markers:',
+  });
+
+  assert.match(prompt, /You may use these inline markers:/);
+  assert.match(prompt, /@status/);
+  assert.match(prompt, /@badge/);
+});
+
+test('getBridgePrompt supports selecting a subset of bridges', () => {
+  const statusBridge = defineBridge({
+    marker: 'status',
+    pattern: 'scalar',
+    render: () => null,
+  });
+  const badgeBridge = defineBridge({
+    marker: 'badge',
+    pattern: 'scalar',
+    render: () => null,
+  });
+
+  const prompt = getBridgePrompt([statusBridge, badgeBridge], {
+    include: ['badge'],
+  });
+
+  assert.doesNotMatch(prompt, /@status/);
+  assert.match(prompt, /@badge/);
+});
+
+test('getPrompt includes built-in md4ai syntax guidance by default', () => {
+  const prompt = getPrompt();
+
+  assert.match(prompt, /standard markdown by default/i);
+  assert.match(prompt, /GitHub-style callouts/i);
+  assert.match(prompt, /::kpi/);
+});
+
+test('getPrompt minimal mode stays compact but keeps fallback guidance', () => {
+  const prompt = getPrompt({
+    mode: 'minimal',
+    includeBuiltins: ['kpi', 'steps'],
+    includeBridgePrompts: false,
+  });
+
+  assert.match(prompt, /Write normal markdown by default/i);
+  assert.match(prompt, /If unsure, fall back to plain markdown/i);
+  assert.match(prompt, /::kpi/);
+  assert.match(prompt, /```steps/);
+  assert.doesNotMatch(prompt, /Example:/);
+});
+
+test('getPrompt withExamples mode includes canonical examples', () => {
+  const prompt = getPrompt({
+    mode: 'withExamples',
+    includeBuiltins: ['kpi', 'steps'],
+    includeBridgePrompts: false,
+  });
+
+  assert.match(prompt, /Example:/);
+  assert.match(prompt, /::kpi\{label="Revenue"/);
+  assert.match(prompt, /- \[done\] Gather requirements/);
+});
+
+test('getPrompt supports selecting only some built-in topics', () => {
+  const prompt = getPrompt({
+    includeBuiltins: ['kpi', 'tables'],
+    includeBaseInstruction: false,
+    includeBridgePrompts: false,
+  });
+
+  assert.match(prompt, /::kpi/);
+  assert.match(prompt, /markdown tables/i);
+  assert.doesNotMatch(prompt, /GitHub-style callouts/i);
+});
+
+test('getPrompt standard mode keeps guardrails without full examples', () => {
+  const prompt = getPrompt({
+    mode: 'standard',
+    includeBuiltins: ['tables', 'callouts'],
+    includeBridgePrompts: false,
+  });
+
+  assert.match(prompt, /fall back to plain markdown/i);
+  assert.match(prompt, /GitHub-style callouts/i);
+  assert.doesNotMatch(prompt, /Example:/);
+});
+
+test('getPrompt can combine built-ins with a selected subset of bridges', () => {
+  const paymentBridge = defineBridge({
+    marker: 'payment',
+    pattern: 'keyvalue',
+    render: () => null,
+  });
+  const releaseBridge = defineBridge({
+    marker: 'release',
+    pattern: 'keyvalue',
+    render: () => null,
+  });
+
+  const prompt = getPrompt({
+    bridges: [paymentBridge, releaseBridge],
+    includeBuiltins: ['buttons'],
+    includeBridges: ['payment'],
+  });
+
+  assert.match(prompt, /::button/);
+  assert.match(prompt, /@payment/);
+  assert.doesNotMatch(prompt, /@release/);
+});
+
+test('builtinPromptTopics exposes the supported built-in prompt selections', () => {
+  assert.deepEqual(builtinPromptTopics, [
+    'callouts',
+    'charts',
+    'steps',
+    'kpi',
+    'cards',
+    'layout',
+    'buttons',
+    'inputs',
+    'video',
+    'tables',
+  ]);
 });
 
 test('renderContent falls back to visible source when a bridge renderer throws', () => {

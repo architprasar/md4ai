@@ -1,141 +1,116 @@
-export const SHOWCASE_CONTENT = `# Q1 2025 Business Review
+export const SHOWCASE_CONTENT = `# PR #2847 — Checkout v3 Refactor
 
-Here's your complete Q1 performance summary across all regions, with strategic recommendations for Q2.
+CodeSentinel has finished analyzing this pull request. The review found **3 blocking issues** that must be resolved before merge: one SQL injection vector, one exposed secret in logs, and one authorization bypass path.
 
-## Executive Snapshot
+@agent[name: CodeSentinel, role: AI Security + Quality Reviewer, status: done, latency: 4.2s, tools: AST Analysis|Semgrep|Test Runner|Coverage Map, goal: Block insecure merges before they reach main]
 
-::kpi{label="Total Revenue" value="$617k" change="+11%" period="QoQ"}
-::kpi{label="East Region" value="$167k" change="+18%" period="QoQ"}
-::kpi{label="APAC" value="$89k" change="+20%" period="QoQ"}
-::kpi{label="South Region" value="$98k" change="-7%" period="QoQ"}
+---
 
-## Q2 Rollout Plan
+## Changed Files
 
-\`\`\`steps
-- [done] Reconcile Q1 finance and CRM numbers
-- [active] Investigate South SMB churn
-  Pricing sensitivity is the leading signal from exit surveys.
-- [active] Roll out the East enterprise playbook
-  Enablement sessions are already scheduled for next week.
-- [planned] Lock APAC hiring and support coverage
-\`\`\`
 
-## Revenue Performance
+@fileheat[title: "47 files ", files: "src/checkout/processor.ts:98:modified|src/checkout/validator.ts:82:modified|src/auth/session.ts:71:added|src/billing/charge.ts:65:modified|src/db/queries.ts:91:modified|src/db/migrations/0031.sql:55:added|src/api/webhooks.ts:44:modified|src/utils/logger.ts:38:modified|tests/checkout.test.ts:30:added|tests/billing.test.ts:18:deleted"]
 
-\`\`\`chart
-{
-  "type": "bar",
-  "labels": ["North", "South", "East", "West", "APAC"],
-  "datasets": [
-    {
-      "label": "Q1 2025 ($k)",
-      "data": [142, 98, 167, 121, 89],
-      "backgroundColor": ["#6366f1","#6366f1","#6366f1","#6366f1","#6366f1"]
-    },
-    {
-      "label": "Q4 2024 ($k)",
-      "data": [128, 105, 141, 110, 74],
-      "backgroundColor": ["#e4e4e7","#e4e4e7","#e4e4e7","#e4e4e7","#e4e4e7"]
-    }
-  ]
-}
-\`\`\`
 
-## Regional Trends
 
-East: @sparkline[48, 52, 61, 58, 67, 71]
-North: @sparkline[44, 47, 51, 49, 55, 58]
-South: @sparkline[38, 35, 30, 28, 30, 27]
-APAC: @sparkline[22, 26, 31, 35, 41, 47]
+---
 
-## Key Insights
+## Module Dependency Graph
 
-> [!NOTE]
-> **East region** leads all markets at **$167k** — the Meridian Corp enterprise deal closed in late February and immediately contributed $34k. This playbook is repeatable.
+The refactor split the monolithic checkout controller into four focused modules. Two new dependency edges introduce coupling that did not exist in v2 — both are flagged below.
 
-> [!TIP]
-> **APAC** is your highest-growth market at +20% QoQ from a smaller base. Two additional AE headcount now compounds faster than anywhere else in the portfolio.
+@servicemap[title: "Checkout v3 module graph"; note: "New edges highlighted. billing to logger is the leak path."; nodes: api,API Layer,0,80,active,POST /checkout|validator,Input Validator,220,0,done,schema v3|processor,Checkout Processor,220,160,blocked,SQL blocker|billing,Billing Module,460,80,blocked,secret leak|db,DB Query Layer,460,240,active,parameterized|logger,Logger,680,80,blocked,logs PII; edges: api>validator>validate request|api>processor>process|processor>db>query|processor>billing>charge|billing>logger>audit trail|validator>processor>pass through]
+
+---
+
+## Security Blockers
+
+@signal[title: SQL injection in processor.ts:114, tone: critical, score: 9.4, trend: new, note: User-controlled input interpolated directly into a raw SQL string. Parameterized query required.]
+
+@signal[title: Secret written to structured log in billing.ts:67, tone: critical, score: 8.8, trend: new, note: stripe_secret_key appears in the audit trail object passed to logger.info. Strip before logging.]
 
 > [!WARNING]
-> **South region** declined 7% — SMB churn is accelerating. Exit survey data shows pricing sensitivity as the primary driver, not product dissatisfaction.
+> A third path in session.ts:203 allows an authenticated user to skip the authorization check if the request carries a \`x-internal: 1\` header. Any browser request can set this header.
 
-## Performance Table
+@signal[title: Authorization bypass via x-internal header in session.ts:203, tone: warning, score: 7.1, trend: new, note: The internal-request fast path trusts a client-supplied header with no IP allowlist or HMAC verification.]
 
-| Region | Q1 Revenue | QoQ | ARR Run Rate | Risk |
-|--------|-----------|-----|-------------|------|
-| East | $167k | +18% | $2.0M | Low |
-| North | $142k | +11% | $1.7M | Low |
-| West | $121k | +10% | $1.5M | Medium |
-| South | $98k | -7% | $1.2M | High |
-| APAC | $89k | +20% | $1.1M | Low |
-| Total | $617k | +11% | $7.5M | Stable |
+---
 
-## Monthly Trend
+## Test Coverage
 
-\`\`\`chart
-{
-  "type": "line",
-  "labels": ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"],
-  "datasets": [
-    { "label": "East", "data": [48, 52, 61, 58, 67, 71], "borderColor": "#6366f1", "backgroundColor": "rgba(99,102,241,0.08)", "fill": true },
-    { "label": "APAC", "data": [22, 26, 31, 35, 41, 47], "borderColor": "#16a34a", "backgroundColor": "rgba(22,163,74,0.06)", "fill": true },
-    { "label": "South", "data": [38, 35, 30, 28, 30, 27], "borderColor": "#dc2626", "backgroundColor": "rgba(220,38,38,0.06)", "fill": true }
-  ]
-}
+Coverage dropped in the two highest-risk modules. The deleted billing test file accounts for most of the regression.
+
+@kpi[label: Checkout Processor, value: 61%, change: -14%, period: vs main]
+@kpi[label: Billing Module, value: 48%, change: -31%, period: vs main]
+@kpi[label: Auth + Session, value: 83%, change: +6%, period: vs main]
+
+@gauge[label: Checkout Processor, value: 61, max: 100, unit: %, warn: 75, crit: 65]
+@gauge[label: Billing Module, value: 48, max: 100, unit: %, warn: 75, crit: 65]
+@gauge[label: Auth + Session, value: 83, max: 100, unit: %, warn: 75, crit: 65]
+
+> [!NOTE]
+> The 65% threshold is enforced by CI. Both Checkout Processor and Billing Module will fail the coverage gate on the current branch.
+
+---
+
+## Performance Signals
+
+Checkout p95 latency trended up across the last 7 commits on this branch. The regression correlates with the new validation layer running full schema checks on every request — including read-only status pings that do not require them.
+
+Checkout p95 latency (ms, last 7 commits): @sparkline[38, 41, 45, 49, 58, 62, 71]
+DB query time (ms): @sparkline[11, 12, 11, 14, 18, 21, 19]
+Bundle size delta (kb): @sparkline[0, 0, 2, 2, 8, 8, 8]
+
+---
+
+## New Dependencies Introduced
+
+@release[name: zod v3.22 (schema validation), status: beta, eta: Pinned at rc.2, owner: Archit]
+@release[name: stripe-node v14 (billing SDK), status: live, eta: Stable, owner: Platform]
+
+---
+
+## Review Status
+
+\`\`\`steps
+- [done] Static analysis complete
+  AST scan, Semgrep ruleset, and secret-pattern match finished in 4.2 s across 47 files.
+
+- [done] Dependency audit complete
+  Two new packages added. zod is pinned at a release candidate — pin to a stable release before merging.
+
+- [active] Waiting on author fixes
+  Three blockers filed as inline comments. Processor SQL fix is in progress per author's last commit.
+
+- [planned] Re-run coverage gate
+  Coverage check will re-run automatically once the billing test file is restored or replaced.
+
+- [planned] Final approval
+  Two approvals required. Security lead must approve given the SQL and secret findings.
 \`\`\`
 
-## Recommended Actions
+---
 
-:::card{title="This Week"}
-Run the South SMB exit survey analysis — 47 churned accounts in Q1, data is already in the CRM. Identify the top 3 objection patterns before the regional QBR on Thursday.
+## Author Action Items
+
+- [ ] Fix SQL injection in \`src/db/queries.ts:114\` — replace string interpolation with parameterized \`$1\` binding
+- [ ] Strip \`stripe_secret_key\` from the logger payload in \`src/billing/charge.ts:67\` before calling \`logger.info\`
+- [ ] Remove the \`x-internal\` header fast path in \`src/auth/session.ts:203\` or gate it behind an IP allowlist
+- [ ] Restore or rewrite \`tests/billing.test.ts\` — coverage gate will block merge until Billing Module reaches 65%
+- [ ] Pin \`zod\` to a stable release (currently \`3.22.0-rc.2\`)
+- [ ] Add validation guard on status-ping routes to skip full schema parse — fixes the p95 regression
+
+---
+
+:::card{title="Upgrade to CodeSentinel Pro for team-wide enforcement"}
+The free tier analyzed this PR in isolation. Pro adds merge blocking at the branch protection level, a historical exploit pattern database, auto-fix suggestions with one-click PR commits, and Slack + Linear integration so blockers surface in your existing workflow — not just in the review tab.
 :::
 
-:::card{title="This Month"}
-Promote the East AE playbook company-wide. Schedule a 2-hour session where the East team walks through the Meridian deal cycle. Record it. Every AE should watch it before their next enterprise call.
-:::
+@payment[amount: $79, plan: CodeSentinel Pro, desc: Automatic merge blocking, exploit pattern database, auto-fix PRs, and Slack or Linear integration for every repository in your organization.]
 
-## Q2 Roadmap
+::button[Enable merge protection]{href="#" variant="primary"}
 
-\`\`\`timeline
-South Retention | active | Retention offer and pricing analysis are in progress
-East Playbook Rollout | active
-APAC Hiring | planned
-West Pipeline Build | planned
-Q2 Forecast Lock | planned
-\`\`\`
+::button[View full audit log]{href="#" variant="secondary"}
 
----
-
-\`\`\`layout columns=2
-### Strengths to Protect
-- East enterprise motion — repeatable and documented
-- APAC partner channel — gaining momentum
-- North AE onboarding program — 3 new reps ramped
-
----
-
-### Risks to Address
-- South SMB churn accelerating — pricing perception
-- West Q2 pipeline coverage at 1.4× — below 2× target
-- APAC lacks dedicated support resources post-sale
-\`\`\`
-
----
-
-## Action Items
-
-- [x] Pull Q1 revenue data from CRM
-- [x] Identify top 47 churned accounts in South
-- [x] East playbook documentation complete
-- [ ] Schedule South region retention campaign
-- [ ] Allocate 2 APAC AE headcount — req submitted
-- [ ] Build Q2 forecast model with scenario analysis
-
----
-
-## Unlock AI Deal Scoring
-
-Predict which deals close before your AEs waste cycles on them. Our AI scoring model trained on 14,000 closed-won and closed-lost deals is available on Pro.
-
-@payment[amount: $49, plan: Pro Monthly, desc: AI deal scoring, unlimited regional forecasts, and Slack digest for your entire team]
+::input{type="text" placeholder="Ask CodeSentinel about another file, rule, or fix..." label="Follow-up"}
 `;

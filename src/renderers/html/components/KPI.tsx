@@ -8,8 +8,16 @@ interface Props {
 export function KPI({ label, value, change, period }: Props) {
   const isPositive = !!change && /^\s*\+/.test(change);
   const isNegative = !!change && /^\s*-/.test(change);
-  const changeColor = isPositive ? '#16a34a' : isNegative ? '#dc2626' : 'var(--text-muted)';
-  const changeBg = isPositive ? '#dcfce7' : isNegative ? '#fee2e2' : 'var(--surface2)';
+  const changeColor = isPositive
+    ? 'color-mix(in srgb, #22c55e 78%, var(--text))'
+    : isNegative
+      ? 'color-mix(in srgb, #ef4444 82%, var(--text))'
+      : 'var(--text-muted)';
+  const changeBg = isPositive
+    ? 'color-mix(in srgb, #22c55e 14%, var(--surface))'
+    : isNegative
+      ? 'color-mix(in srgb, #ef4444 14%, var(--surface))'
+      : 'color-mix(in srgb, var(--surface2) 92%, var(--surface))';
 
   return (
     <div
@@ -19,8 +27,10 @@ export function KPI({ label, value, change, period }: Props) {
         borderRadius: '1rem',
         border: '1px solid var(--border)',
         background: 'var(--surface)',
-        boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.08)',
+        boxShadow: 'var(--shadow-xs)',
         padding: '1rem 1.1rem',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
       <div

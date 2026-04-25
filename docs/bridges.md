@@ -17,7 +17,7 @@ Avoid asking the model to emit large nested payloads or final authoritative busi
 `md4ai` exports `parseBridgeData()` for the built-in bridge patterns:
 
 ```ts
-import { parseBridgeData } from 'md4ai/core';
+import { parseBridgeData } from '@architprasar/md4ai/core';
 
 parseBridgeData('scalar', 'healthy');
 parseBridgeData('array', 'East, North, APAC');

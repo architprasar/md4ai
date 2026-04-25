@@ -60,8 +60,23 @@ export function Chart({ chartType, data }: Props) {
       const textColor = style.getPropertyValue('--text').trim() || '#212529';
       const mutedColor = style.getPropertyValue('--text-muted').trim() || '#6c757d';
       const borderColor = style.getPropertyValue('--border').trim() || '#e9ecef';
-
-      const datasets = current.datasets ?? [{ label: 'Value', data: current.data ?? [] }];
+      const accentColor = style.getPropertyValue('--accent').trim() || '#2563eb';
+      const surfaceColor = style.getPropertyValue('--surface').trim() || '#ffffff';
+      const datasets = (current.datasets ?? [{ label: 'Value', data: current.data ?? [] }]).map((dataset) => {
+        if (dataset.backgroundColor) return dataset;
+        return {
+          ...dataset,
+          backgroundColor: accentColor,
+          borderColor: accentColor,
+          pointBackgroundColor: accentColor,
+          pointBorderColor: surfaceColor,
+          pointHoverBackgroundColor: accentColor,
+          pointHoverBorderColor: surfaceColor,
+          borderWidth: chartType === 'line' ? 2 : 1,
+          tension: chartType === 'line' ? 0.35 : undefined,
+          fill: false,
+        };
+      });
 
       chartRef.current = new ChartJS(canvasRef.current, {
         type: chartType as 'bar' | 'line' | 'pie' | 'doughnut',
@@ -70,7 +85,17 @@ export function Chart({ chartType, data }: Props) {
           responsive: true,
           maintainAspectRatio: false,
           color: textColor,
-          plugins: { legend: { labels: { color: textColor } } },
+          plugins: {
+            legend: { labels: { color: textColor } },
+            tooltip: {
+              backgroundColor: surfaceColor,
+              titleColor: textColor,
+              bodyColor: textColor,
+              borderColor,
+              borderWidth: 1,
+              displayColors: true,
+            },
+          },
           scales: {
             x: { ticks: { color: mutedColor }, grid: { color: borderColor }, border: { color: borderColor } },
             y: { ticks: { color: mutedColor }, grid: { color: borderColor }, border: { color: borderColor } },
@@ -92,10 +117,27 @@ export function Chart({ chartType, data }: Props) {
   // Runs whenever actual chart content changes, but never destroys the chart.
   useEffect(() => {
     if (!chartRef.current || !d) return;
-    const datasets = d.datasets ?? [{ label: 'Value', data: d.data ?? [] }];
+    const style = canvasRef.current ? getComputedStyle(canvasRef.current) : null;
+    const accentColor = style?.getPropertyValue('--accent').trim() || '#2563eb';
+    const surfaceColor = style?.getPropertyValue('--surface').trim() || '#ffffff';
+    const datasets = (d.datasets ?? [{ label: 'Value', data: d.data ?? [] }]).map((dataset) => {
+      if (dataset.backgroundColor) return dataset;
+      return {
+        ...dataset,
+        backgroundColor: accentColor,
+        borderColor: accentColor,
+        pointBackgroundColor: accentColor,
+        pointBorderColor: surfaceColor,
+        pointHoverBackgroundColor: accentColor,
+        pointHoverBorderColor: surfaceColor,
+        borderWidth: chartType === 'line' ? 2 : 1,
+        tension: chartType === 'line' ? 0.35 : undefined,
+        fill: false,
+      };
+    });
     chartRef.current.data = { labels: d.labels ?? [], datasets };
     chartRef.current.update('none');
-  }, [dataKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chartType, dataKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!d) {
     return (

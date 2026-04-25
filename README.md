@@ -3,7 +3,7 @@
 **Rich markdown for AI.** Drop md4ai into your AI chat UI and responses automatically render as charts, callouts, cards, KPI metrics, timelines, and more — no prompt engineering, no JSON, just markdown.
 
 ```
-npm install md4ai
+npm install @architprasar/md4ai
 ```
 
 > **Peer deps:** `react >=18`, `react-dom >=18`  
@@ -19,13 +19,15 @@ The usual fix is prompt engineering — coerce the AI into outputting JSON, pars
 
 md4ai takes a different approach: **extend markdown itself.** The AI writes markdown. md4ai renders it as rich UI. No JSON. No custom formats. No prompt gymnastics.
 
+Another practical advantage: this often saves tokens compared to custom JSON UI schemas. Markdown plus compact directives like `::kpi{...}` or `@release[...]` is usually smaller than nested `type/props/content` JSON, and it also reduces repair-cost tokens from malformed structured output.
+
 ---
 
 ## Quickstart
 
 ```tsx
-import { parse } from 'md4ai/core';
-import { renderContent } from 'md4ai/react';
+import { parse } from '@architprasar/md4ai/core';
+import { renderContent } from '@architprasar/md4ai/react';
 
 function AIMessage({ content }: { content: string }) {
   return renderContent(parse(content));
@@ -35,8 +37,8 @@ function AIMessage({ content }: { content: string }) {
 For streaming responses — call on the full accumulated text every chunk:
 
 ```tsx
-import { parseStreaming } from 'md4ai/core';
-import { renderContent } from 'md4ai/react';
+import { parseStreaming } from '@architprasar/md4ai/core';
+import { renderContent } from '@architprasar/md4ai/react';
 
 function StreamingMessage({ text }: { text: string }) {
   // Safe mid-stream — unclosed fences render as placeholders, never throw
@@ -47,11 +49,11 @@ function StreamingMessage({ text }: { text: string }) {
 If you want a clearer package boundary, use subpath imports:
 
 ```tsx
-import { parse, parseStreaming, defineBridge } from 'md4ai/core';
-import { renderContent, themes } from 'md4ai/react';
+import { parse, parseStreaming, defineBridge } from '@architprasar/md4ai/core';
+import { renderContent, themes } from '@architprasar/md4ai/react';
 ```
 
-`md4ai` still re-exports the full API for backwards compatibility, but `md4ai/core` and `md4ai/react` make the parser/renderer split explicit.
+`md4ai` still re-exports the full API for backwards compatibility, but `@architprasar/md4ai/core` and `@architprasar/md4ai/react` make the parser/renderer split explicit.
 
 ---
 
@@ -276,7 +278,7 @@ Project status: @timeline[Discovery: done, Design: done, Build: active, Launch: 
 ### Define a bridge
 
 ```tsx
-import { defineBridge } from 'md4ai/core';
+import { defineBridge } from '@architprasar/md4ai/core';
 
 const statusBridge = defineBridge({
   marker: 'status',
@@ -302,14 +304,56 @@ const ui = renderContent(nodes, { bridges });
 
 ### System prompt hint
 
-Each bridge auto-generates a hint for the AI:
+Use `getPrompt()` when you want a full md4ai-aware prompt that includes built-in syntax guidance plus optional bridge hints. Use `getBridgePrompt()` when you only want the bridge-specific portion:
 
 ```ts
+import { getPrompt, getBridgePrompt } from '@architprasar/md4ai/core';
+
 statusBridge.prompt
 // → 'Use @status[value] inline. Example: @status[success]'
 
-// Auto-build your full system prompt:
-const systemPrompt = bridges.map(b => b.prompt).join('\n');
+const systemPrompt = getPrompt({
+  bridges,
+  prefix: 'Write markdown and use md4ai syntax when it helps:',
+});
+
+const analyticsPrompt = getPrompt({
+  bridges,
+  includeBuiltins: ['callouts', 'charts', 'kpi', 'tables'],
+  includeBridges: ['status'],
+});
+
+const bridgeOnlyPrompt = getBridgePrompt(bridges, {
+  include: ['payment', 'status'],
+});
+```
+
+`getPrompt()` supports three modes:
+
+- `minimal` — smallest useful prompt, with strong fallback guidance and no long examples
+- `standard` — recommended default for most production surfaces
+- `withExamples` — higher-token mode with canonical examples for better syntax reliability
+
+Example:
+
+```ts
+const minimalPrompt = getPrompt({
+  mode: 'minimal',
+  includeBuiltins: ['kpi', 'tables', 'steps'],
+});
+
+const standardPrompt = getPrompt({
+  mode: 'standard',
+  bridges,
+  includeBuiltins: ['callouts', 'kpi', 'tables', 'steps'],
+});
+
+const examplePrompt = getPrompt({
+  mode: 'withExamples',
+  bridges,
+  includeBuiltins: ['steps', 'kpi', 'buttons'],
+  includeBridges: ['payment'],
+});
 ```
 
 ---
@@ -344,7 +388,7 @@ defineBridge({
 If you want to reuse the built-in parsers directly in your own helpers, `parseBridgeData()` is exported:
 
 ```ts
-import { parseBridgeData } from 'md4ai/core';
+import { parseBridgeData } from '@architprasar/md4ai/core';
 
 const tags = parseBridgeData('array', 'React, Vue, Angular');
 // → ['React', 'Vue', 'Angular']
@@ -418,8 +462,8 @@ If a bridge renderer throws at render time, md4ai falls back to showing the orig
 Four built-in themes, each with light and dark variants. All use the same CSS variable system as shadcn — plug straight into your existing shadcn app.
 
 ```tsx
-import { renderContent, themes } from 'md4ai/react';
-import type { ThemeName } from 'md4ai/react';
+import { renderContent, themes } from '@architprasar/md4ai/react';
+import type { ThemeName } from '@architprasar/md4ai/react';
 
 renderContent(nodes, {
   theme: themes.violet.dark,
@@ -492,7 +536,7 @@ Works with highlight.js, Shiki, Prism, lowlight — anything that returns an HTM
 Replace any built-in renderer with your own component:
 
 ```tsx
-import type { ComponentOverrides } from 'md4ai/react';
+import type { ComponentOverrides } from '@architprasar/md4ai/react';
 
 renderContent(nodes, {
   components: {
@@ -558,7 +602,7 @@ See [`docs/production.md`](./docs/production.md) for production patterns using `
 ### `themes`
 
 ```ts
-import { themes } from 'md4ai/react';
+import { themes } from '@architprasar/md4ai/react';
 // themes.zinc.light | themes.zinc.dark
 // themes.violet.light | themes.violet.dark
 // themes.rose.light | themes.rose.dark

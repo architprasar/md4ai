@@ -1,21 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { parseStreaming } from 'md4ai/core';
-import { renderContent, themes } from 'md4ai/react';
+import { parseStreaming } from '@architprasar/md4ai/core';
+import { renderContent, themes } from '@architprasar/md4ai/react';
 import { BRIDGES } from './bridges.js';
 import { SHOWCASE_CONTENT } from './showcaseContent.js';
-import hljs from 'highlight.js';
+import { SiteBackdrop } from './components/SiteBackdrop.js';
+import { SiteHeader } from './components/SiteHeader.js';
+import { demoChromeVars, tokensToCSSVars, useStoredColorMode } from './theme.js';
+import { highlightCode } from './highlight.js';
 
-const HIGHLIGHT = (code: string, lang: string) => {
-  if (lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value;
-  return hljs.highlightAuto(code).value;
-};
-
-const SPEED = 18;
-const TICK = 12;
+const SPEED = 9;
+const TICK = 18;
 const PILLARS = [
   {
     title: 'Markdown-first by default',
-    copy: 'Use markdown that models already produce, then layer in charts, KPIs, callouts, timelines, and richer UI only where it helps.',
+    copy: 'Use markdown that models already produce, then add structured UI only where it makes the response easier to act on.',
   },
   {
     title: 'Streaming-safe rendering',
@@ -23,15 +21,27 @@ const PILLARS = [
   },
   {
     title: 'Extensible without lock-in',
-    copy: 'Reach for bridges when you need custom product components, but keep the core authoring experience readable as plain text.',
+    copy: 'Use bridges for product-specific surfaces like support cases, rollout decisions, or account risk, while keeping the source readable.',
   },
 ];
 
 const USE_CASES = [
-  'AI chat products',
-  'Ops and analytics reports',
-  'Agent dashboards',
-  'Product and roadmap reviews',
+  {
+    title: 'Trading terminal',
+    copy: 'Candlestick charts, position cards, trade setups, and watchlist tables rendered from one streamed markdown note.',
+  },
+  {
+    title: 'Incident command',
+    copy: 'Dependency graphs, service tables, rollback timelines, and operator steps can live inside the same AI response.',
+  },
+  {
+    title: 'Revenue war room',
+    copy: 'Pipeline flow boards, renewal KPIs, releases, and forecast visuals work without leaving markdown-first authoring.',
+  },
+  {
+    title: 'Mixed surfaces',
+    copy: 'md4ai can move across very different domains in one stream while the host app still owns the final UI.',
+  },
 ];
 
 function useStream(full: string) {
@@ -67,22 +77,20 @@ function useStream(full: string) {
 }
 
 export default function ShowcasePage() {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useStoredColorMode();
   const theme = themes.zinc[isDark ? 'dark' : 'light'];
   const { text, done, replay } = useStream(SHOWCASE_CONTENT);
 
   const cssVars = useMemo(() => ({
-    '--bg': theme.bg, '--surface': theme.surface, '--surface2': theme.surface2,
-    '--border': theme.border, '--text': theme.text, '--text-muted': theme.textMuted,
-    '--accent': theme.accent, '--accent-hover': theme.accentHover,
-    '--code-bg': theme.codeBg, '--code-text': theme.codeText,
-  } as React.CSSProperties), [theme]);
+    ...tokensToCSSVars(theme),
+    ...demoChromeVars(isDark),
+  }), [theme, isDark]);
 
   const rendered = useMemo(() => {
     if (!text) return null;
     try {
       return renderContent(parseStreaming(text, { bridges: BRIDGES }), {
-        highlight: HIGHLIGHT, theme, bridges: BRIDGES,
+        highlight: highlightCode, theme, bridges: BRIDGES,
         onEvent: (event, data) => {
           if (event === 'pay') alert('Payment initiated: ' + JSON.stringify(data));
         },
@@ -92,67 +100,19 @@ export default function ShowcasePage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', position: 'relative', overflowX: 'hidden', ...cssVars }}>
-      <div
-        style={{
-          position: 'absolute',
-          inset: '0 0 auto',
-          height: 560,
-          pointerEvents: 'none',
-          background: [
-            'radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 26%)',
-            'radial-gradient(circle at 86% 10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 28%)',
-            'linear-gradient(180deg, color-mix(in srgb, var(--accent) 4%, var(--bg)) 0%, transparent 100%)',
-          ].join(', '),
-        }}
+      <SiteBackdrop height={560} />
+      <SiteHeader
+        currentPage="showcase"
+        position="sticky"
+        rightSlot={
+          <>
+            <a href="./index.html" className="btn-icon" style={{ textDecoration: 'none' }}>Dev tool →</a>
+            <button onClick={() => setIsDark(d => !d)} className="btn-icon">
+              {isDark ? 'Light' : 'Dark'}
+            </button>
+          </>
+        }
       />
-      <nav className="app-header" style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '1rem',
-        minHeight: 52,
-        padding: '0 1.25rem',
-        background: 'color-mix(in srgb, var(--bg) 82%, transparent)',
-        backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid var(--border)',
-      }}>
-        <div className="app-header__identity" style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 }}>
-          <div className="app-header__logo" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span className="app-header__logo-text" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em' }}>md4ai</span>
-            <span className="app-header__tagline" style={{
-              fontSize: '0.7rem',
-              color: 'var(--text-muted)',
-              background: 'var(--surface2)',
-              border: '1px solid var(--border)',
-              padding: '0.15rem 0.5rem',
-              borderRadius: '9999px',
-              letterSpacing: '0.01em',
-            }}>rich markdown for AI</span>
-          </div>
-          <div className="app-header__nav" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.82rem' }}>
-            <a href="./showcase.html" style={{
-              color: 'var(--text)',
-              textDecoration: 'none',
-              background: 'var(--surface2)',
-              border: '1px solid var(--border)',
-              borderRadius: '9999px',
-              padding: '0.22rem 0.6rem',
-            }}>Showcase</a>
-            <a href="./index.html" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Playground</a>
-            <a href="./docs.html" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Docs</a>
-            <a href="https://github.com/architprasar/md4ai" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>GitHub</a>
-          </div>
-        </div>
-        <div className="app-header__actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <a href="./index.html" className="btn-icon" style={{ textDecoration: 'none' }}>Dev tool →</a>
-          <button onClick={() => setIsDark(d => !d)} className="btn-icon">
-            {isDark ? 'Light' : 'Dark'}
-          </button>
-        </div>
-      </nav>
 
       <section style={{ position: 'relative', padding: '4.75rem 2rem 3rem' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(300px, 0.85fr)', gap: '1.5rem', alignItems: 'start' }}>
@@ -178,6 +138,9 @@ export default function ShowcasePage() {
             <p style={{ fontSize: 'clamp(1rem, 2vw, 1.15rem)', color: 'var(--text-muted)', maxWidth: 640, margin: '0 0 1.35rem', lineHeight: 1.72 }}>
               md4ai helps teams render AI responses as polished product surfaces instead of raw chat text. Parse markdown once, stream it safely, and turn it into tables, KPI cards, steps, timelines, charts, callouts, and custom bridges without inventing a new authoring format.
             </p>
+            <p style={{ fontSize: '0.96rem', color: 'var(--text-muted)', maxWidth: 650, margin: '0 0 1.2rem', lineHeight: 1.72 }}>
+              This showcase now mixes three richer use cases in one response: a trading terminal, an incident command center, and a revenue war room, each with domain-specific bridge components and external visualization libraries.
+            </p>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
               <a href="./docs.html" style={{
@@ -194,11 +157,18 @@ export default function ShowcasePage() {
                 padding: '0.72rem 1.15rem', fontSize: '0.9rem',
                 fontWeight: 650, textDecoration: 'none',
               }}>Open playground</a>
+              <a href="./token-efficiency.html" style={{
+                display: 'inline-flex', alignItems: 'center',
+                background: 'var(--surface)', color: 'var(--text)',
+                border: '1px solid var(--border)', borderRadius: '0.7rem',
+                padding: '0.72rem 1.15rem', fontSize: '0.9rem',
+                fontWeight: 650, textDecoration: 'none',
+              }}>Why it can save tokens</a>
               <code style={{
                 background: 'var(--surface2)', border: '1px solid var(--border)',
                 borderRadius: '0.7rem', padding: '0.72rem 0.9rem',
                 fontSize: '0.82rem', fontWeight: 500, fontFamily: 'JetBrains Mono, monospace',
-              }}>npm install md4ai</code>
+              }}>npm install @architprasar/md4ai</code>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' as const }}>
@@ -256,7 +226,7 @@ export default function ShowcasePage() {
       <section style={{ padding: '0 2rem 2.5rem' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
           {USE_CASES.map((item, index) => (
-            <div key={item} style={{
+            <div key={item.title} style={{
               border: '1px solid var(--border)',
               background: 'color-mix(in srgb, var(--surface) 95%, transparent)',
               borderRadius: '1rem',
@@ -266,9 +236,9 @@ export default function ShowcasePage() {
               <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.45rem' }}>
                 Use case
               </span>
-              <strong style={{ display: 'block', fontSize: '1rem', letterSpacing: '-0.03em', marginBottom: '0.25rem' }}>{item}</strong>
+              <strong style={{ display: 'block', fontSize: '1rem', letterSpacing: '-0.03em', marginBottom: '0.25rem' }}>{item.title}</strong>
               <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.55 }}>
-                Good fit when you want LLM output to stay editable as markdown but render like a real interface.
+                {item.copy}
               </span>
             </div>
           ))}
@@ -312,7 +282,7 @@ export default function ShowcasePage() {
               What this page is showing
             </span>
             <p style={{ color: 'var(--text-muted)', margin: 0, lineHeight: 1.7 }}>
-              The response below is streamed markdown rendered through md4ai. It mixes standard markdown with richer blocks like charts, cards, KPI tiles, tables, steps, timelines, and bridge-powered interactions in the same message flow.
+              The response below is one streamed markdown payload rendered through md4ai. It deliberately crosses product domains in a single flow so you can see charts, tables, KPIs, launch badges, operator cards, decision signals, and monetization components coexist without leaving markdown.
             </p>
           </div>
           <div style={{
@@ -325,7 +295,7 @@ export default function ShowcasePage() {
               Happy path
             </span>
             <code style={{ display: 'block', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.8rem', lineHeight: 1.75, whiteSpace: 'pre-wrap' as const }}>
-              {`import { parseStreaming } from 'md4ai/core';\nimport { renderContent } from 'md4ai/react';`}
+              {`import { parseStreaming } from '@architprasar/md4ai/core';\nimport { renderContent } from '@architprasar/md4ai/react';`}
             </code>
           </div>
         </div>
@@ -351,7 +321,7 @@ export default function ShowcasePage() {
               AI response · md4ai renderer
             </span>
           </div>
-          <div style={{ padding: '2rem 2.5rem' }}>
+          <div className="showcase-stream" style={{ padding: '2rem 2.5rem' }}>
             {rendered}
             {!done && (
               <span style={{
@@ -396,7 +366,7 @@ export default function ShowcasePage() {
         .md4ai-pre { background: var(--code-bg); border-radius: 0.75rem; padding: 1.1rem 1.3rem; overflow-x: auto; margin-bottom: 1rem; border: 1px solid var(--border); }
         .md4ai-pre code { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.8; color: var(--text); background: none; }
         .md4ai-blockquote { padding: 0.15rem 0 0.15rem 1rem; margin: 0 0 1rem; color: var(--text-muted); font-style: italic; position: relative; }
-        .md4ai-blockquote::before { content: ''; position: absolute; left: 0; top: 0.15em; bottom: 0.15em; width: 2px; border-radius: 9999px; background: color-mix(in srgb, var(--accent) 35%, transparent); }
+        .md4ai-blockquote::before { content: '; position: absolute; left: 0; top: 0.15em; bottom: 0.15em; width: 2px; border-radius: 9999px; background: color-mix(in srgb, var(--accent) 35%, transparent); }
         .md4ai-list { padding-left: 1.5rem; margin-bottom: 1rem; }
         .md4ai-list__item { margin-bottom: 0.3rem; }
         .md4ai-list--task { list-style: none; padding-left: 0.25rem; }

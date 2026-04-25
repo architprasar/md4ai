@@ -1,15 +1,12 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { parse, parseStreaming } from 'md4ai/core';
-import { renderContent, themes } from 'md4ai/react';
-import type { ThemeName } from 'md4ai/react';
+import { parse, parseStreaming } from '@architprasar/md4ai/core';
+import { renderContent, themes } from '@architprasar/md4ai/react';
+import type { ThemeName } from '@architprasar/md4ai/react';
 import { SAMPLE_CONTENTS } from './sampleContent.js';
 import { BRIDGES } from './bridges.js';
-import hljs from 'highlight.js';
-
-const HIGHLIGHT = (code: string, lang: string) => {
-  if (lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value;
-  return hljs.highlightAuto(code).value;
-};
+import { SiteHeader } from './components/SiteHeader.js';
+import { demoChromeVars, tokensToCSSVars, useStoredColorMode } from './theme.js';
+import { highlightCode } from './highlight.js';
 
 // Theme accent colors for the dot picker
 const THEME_DOTS: Record<ThemeName, { light: string; dark: string }> = {
@@ -18,24 +15,6 @@ const THEME_DOTS: Record<ThemeName, { light: string; dark: string }> = {
   rose:   { light: '#e11d48', dark: '#fb7185' },
   blue:   { light: '#2563eb', dark: '#60a5fa' },
 };
-
-// Convert our ThemeTokens to CSS custom properties for the root element
-function tokensToCSSVars(tokens: Record<string, string | undefined>): React.CSSProperties {
-  return {
-    '--bg':           tokens.bg,
-    '--surface':      tokens.surface,
-    '--surface2':     tokens.surface2,
-    '--border':       tokens.border,
-    '--text':         tokens.text,
-    '--text-muted':   tokens.textMuted,
-    '--accent':       tokens.accent,
-    '--accent-hover': tokens.accentHover,
-    '--code-bg':      tokens.codeBg,
-    '--code-text':    tokens.codeText,
-    '--font':         tokens.font,
-    '--mono':         tokens.mono,
-  } as React.CSSProperties;
-}
 
 function useDebounced<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = React.useState(value);
@@ -49,7 +28,7 @@ function useDebounced<T>(value: T, delay: number): T {
 export default function App() {
   const [selectedSample, setSelectedSample] = useState(SAMPLE_CONTENTS[0].id);
   const [source, setSource] = useState(SAMPLE_CONTENTS[0].content);
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useStoredColorMode();
   const [themeName, setThemeName] = useState<ThemeName>('zinc');
   const [dragging, setDragging] = useState(false);
   const [splitPct, setSplitPct] = useState(50);
@@ -62,7 +41,10 @@ export default function App() {
 
   // Active theme tokens
   const themeTokens = themes[themeName][isDark ? 'dark' : 'light'];
-  const cssVars = tokensToCSSVars(themeTokens as Record<string, string | undefined>);
+  const cssVars = {
+    ...tokensToCSSVars(themeTokens as Record<string, string | undefined>),
+    ...demoChromeVars(isDark),
+  };
 
   const stopStream = useCallback(() => {
     if (streamRef.current) clearInterval(streamRef.current);
@@ -103,7 +85,7 @@ export default function App() {
     const parser = isStreaming ? parseStreaming : parse;
     try {
       const ir = parser(text, { bridges: BRIDGES });
-      return renderContent(ir, { highlight: HIGHLIGHT, theme: themeTokens, bridges: BRIDGES });
+      return renderContent(ir, { highlight: highlightCode, theme: themeTokens, bridges: BRIDGES });
     } catch (e) {
       return <pre style={{ color: 'red' }}>{String(e)}</pre>;
     }
@@ -120,28 +102,10 @@ export default function App() {
 
   return (
     <div className="app" style={cssVars} onMouseMove={onMouseMove} onMouseUp={onMouseUp}>
-      <header className="app-header">
-        <div className="app-header__identity">
-          <div className="app-header__logo">
-            <span className="app-header__logo-text">md4ai</span>
-            <span className="app-header__tagline">rich markdown for AI</span>
-          </div>
-          <nav className="app-header__nav" aria-label="Primary">
-            <a href="./showcase.html">Showcase</a>
-            <a href="./index.html" style={{
-              color: 'var(--text)',
-              background: 'var(--surface2)',
-              border: '1px solid var(--border)',
-              borderRadius: '9999px',
-              padding: '0.22rem 0.6rem',
-            }}>Playground</a>
-            <a href="./docs.html">Docs</a>
-            <a href="https://github.com/architprasar/md4ai">GitHub</a>
-          </nav>
-        </div>
-
-        <div className="app-header__actions">
-          {/* Theme dot picker */}
+      <SiteHeader
+        currentPage="playground"
+        rightSlot={
+          <>
           <div className="theme-picker" role="group" aria-label="Choose theme">
             {(Object.keys(themes) as ThemeName[]).map(name => (
               <button
@@ -156,8 +120,6 @@ export default function App() {
               />
             ))}
           </div>
-
-          {/* Stream button */}
           <button
             type="button"
             className={`btn-icon${isStreaming ? ' btn-icon--active' : ''}`}
@@ -166,8 +128,6 @@ export default function App() {
           >
             {isStreaming ? '⏹ Stop' : '▶ Stream'}
           </button>
-
-          {/* Dark mode */}
           <button
             type="button"
             className="btn-icon"
@@ -177,8 +137,9 @@ export default function App() {
           >
             {isDark ? 'Light' : 'Dark'}
           </button>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <section className="playground-intro">
         <div className="playground-intro__copy">
@@ -188,7 +149,10 @@ export default function App() {
             Switch between realistic samples, stream partial responses, and compare source markdown
             with the rendered output side by side.
           </p>
-          <div className="playground-intro__code">import {'{ parse }'} from 'md4ai/core' + import {'{ renderContent }'} from 'md4ai/react'</div>
+          <div className="playground-intro__code">import {'{ parse }'} from '@architprasar/md4ai/core' + import {'{ renderContent }'} from '@architprasar/md4ai/react'</div>
+          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', marginTop: '0.95rem' }}>
+            <a href="./token-efficiency.html" className="btn-icon" style={{ textDecoration: 'none' }}>See token efficiency</a>
+          </div>
         </div>
         <div className="playground-intro__meta">
           <div className="playground-stat">
@@ -202,6 +166,10 @@ export default function App() {
           <div className="playground-stat">
             <strong>Extensible</strong>
             <span>bridges, themes, and renderer overrides</span>
+          </div>
+          <div className="playground-stat">
+            <strong>Often smaller than UI JSON</strong>
+            <span>compact directives can reduce schema overhead and retry cost</span>
           </div>
         </div>
       </section>
