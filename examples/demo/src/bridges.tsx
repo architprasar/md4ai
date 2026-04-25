@@ -1,7 +1,7 @@
 import React from 'react';
 import { createChart, ColorType } from 'lightweight-charts';
 import ReactFlow, { Background, Controls, MarkerType, MiniMap, Position } from 'reactflow';
-import { defineBridge, splitKV, unquoteKV } from '@architprasar/md4ai/core';
+import { defineBridge, splitKV, unquoteKV, B } from '@architprasar/md4ai/core';
 
 type Tone = 'done' | 'active' | 'planned' | 'blocked';
 
@@ -41,141 +41,7 @@ function getTone(value?: string) {
   return STATUS_TONES[normalized] ?? STATUS_TONES.planned;
 }
 
-function splitList(value?: string) {
-  return (value ?? '')
-    .split(/[|,]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
 
-function parseSemicolonKeyValue(raw: string) {
-  const result: Record<string, string> = {};
-  splitKV(raw, ';').forEach((part) => {
-    const colon = part.indexOf(':');
-    if (colon === -1) return;
-    result[part.slice(0, colon).trim()] = unquoteKV(part.slice(colon + 1));
-  });
-  return result;
-}
-
-type CandleBridgeData = {
-  symbol?: string;
-  thesis?: string;
-  levels?: string[];
-  candles: Array<{ time: string; open: number; high: number; low: number; close: number; volume?: number }>;
-};
-
-function parseCandles(raw: string): CandleBridgeData {
-  const record = parseSemicolonKeyValue(raw);
-  const candles = (record.candles ?? '')
-    .split('|')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((item) => {
-      const [time, open, high, low, close, volume] = item.split(':').map((part) => part.trim());
-      return {
-        time,
-        open: Number(open),
-        high: Number(high),
-        low: Number(low),
-        close: Number(close),
-        volume: volume ? Number(volume) : undefined,
-      };
-    })
-    .filter((item) => item.time && [item.open, item.high, item.low, item.close].every((value) => !Number.isNaN(value)));
-
-  return {
-    symbol: record.symbol,
-    thesis: record.thesis,
-    levels: splitList(record.levels),
-    candles,
-  };
-}
-
-type FlowNodeData = { id: string; label: string; x: number; y: number; status?: string; meta?: string };
-
-function parseFlowNodes(value?: string) {
-  return (value ?? '')
-    .split('|')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((item, index) => {
-      const [id, label, x, y, status, meta] = item.split(',').map((part) => part.trim());
-      return {
-        id: id || `node-${index}`,
-        label: label || id || `Node ${index + 1}`,
-        x: Number(x ?? 0),
-        y: Number(y ?? 0),
-        status,
-        meta,
-      };
-    })
-    .filter((item) => !Number.isNaN(item.x) && !Number.isNaN(item.y));
-}
-
-function parseEdges(value?: string) {
-  return (value ?? '')
-    .split('|')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((item, index) => {
-      const [source, target, label] = item.split('>').map((part) => part.trim());
-      return {
-        id: `edge-${index}-${source}-${target}`,
-        source,
-        target,
-        label,
-      };
-    })
-    .filter((edge) => edge.source && edge.target);
-}
-
-type FlowBridgeData = {
-  title?: string;
-  note?: string;
-  nodes: FlowNodeData[];
-  edges: Array<{ id: string; source: string; target: string; label?: string }>;
-};
-
-function parseFlowBridge(raw: string): FlowBridgeData {
-  const record = parseSemicolonKeyValue(raw);
-  return {
-    title: record.title,
-    note: record.note,
-    nodes: parseFlowNodes(record.nodes),
-    edges: parseEdges(record.edges),
-  };
-}
-
-type PipelineStageData = {
-  title?: string;
-  note?: string;
-  stages: Array<{ id: string; label: string; amount: string; count: string; status?: string }>;
-};
-
-function parsePipeline(raw: string): PipelineStageData {
-  const record = parseSemicolonKeyValue(raw);
-  const stages = (record.stages ?? '')
-    .split('|')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((item, index) => {
-      const [label, amount, count, status] = item.split(',').map((part) => part.trim());
-      return {
-        id: `stage-${index}`,
-        label: label || `Stage ${index + 1}`,
-        amount: amount || '—',
-        count: count || '—',
-        status,
-      };
-    });
-
-  return {
-    title: record.title,
-    note: record.note,
-    stages,
-  };
-}
 
 const FlowCard = React.memo(function FlowCard({
   title,
@@ -382,12 +248,12 @@ const MarketChartCard = React.memo(function MarketChartCard({ data }: { data: Ca
 
 export const kpiBridge = defineBridge({
   marker: 'kpi',
-  fields: {
-    label: 'Metric name (e.g., Revenue, Checkout Processor)',
-    value: 'Current value (e.g., $167k, 61%)',
-    change: 'Change vs baseline with sign (e.g., +18%, -14%)',
-    period: 'Comparison period (e.g., QoQ, vs main)',
-  },
+  fields: [
+    B.string('label').describe('Metric name (e.g., Revenue, Checkout Processor)'),
+    B.string('value').describe('Current value (e.g., $167k, 61%)'),
+    B.string('change').describe('Change vs baseline with sign (e.g., +18%, -14%)').optional(),
+    B.string('period').describe('Comparison period (e.g., QoQ, vs main)').optional(),
+  ],
   render: ({ value, label, change, period }) => {
     const isPositive = change?.startsWith('+');
     const isNegative = change?.startsWith('-');
@@ -466,12 +332,13 @@ export const kpiBridge = defineBridge({
   },
 });
 
-export const sparklineBridge = defineBridge<string[]>({
+export const sparklineBridge = defineBridge({
   marker: 'sparkline',
-  pattern: 'array',
-  prompt: 'Use @sparkline[n1, n2, n3, ...] to show a mini trend line inline. Example: @sparkline[44, 47, 51, 48, 61, 58]',
-  render: (items) => {
-    const values = items.map(Number).filter((n) => !isNaN(n));
+  fields: [
+    B.list('items', B.string()).describe('Numbers to plot (e.g. 44, 47, 51)'),
+  ],
+  render: ({ items }) => {
+    const values = (items || []).map(Number).filter((n) => !isNaN(n));
     if (values.length < 2) return null;
 
     const width = 84;
@@ -513,12 +380,13 @@ export const sparklineBridge = defineBridge<string[]>({
   },
 });
 
-export const timelineBridge = defineBridge<Record<string, string>>({
+export const timelineBridge = defineBridge({
   marker: 'timeline',
-  pattern: 'keyvalue',
-  prompt: 'Use @timeline[Step: status, Step: status] to show a project timeline. Status is done/active/planned/blocked. Example: @timeline[Discovery: done, Design: active, Build: planned]',
-  render: (steps) => {
-    const entries = Object.entries(steps);
+  fields: [
+    B.keyvalue('steps').describe('Step: status (done|active|planned|blocked)'),
+  ],
+  render: ({ steps }) => {
+    const entries = Object.entries(steps || {});
 
     return (
       <span
@@ -595,11 +463,11 @@ export const timelineBridge = defineBridge<Record<string, string>>({
 
 export const paymentBridge = defineBridge({
   marker: 'payment',
-  fields: {
-    amount: 'Price per month (e.g., $79)',
-    plan: 'Plan name (e.g., CodeSentinel Pro)',
-    desc: 'One-sentence description of what is included',
-  },
+  fields: [
+    B.string('amount').describe('Price per month (e.g., $79)'),
+    B.string('plan').describe('Plan name (e.g., CodeSentinel Pro)'),
+    B.string('desc').describe('One-sentence description of what is included').optional(),
+  ],
   render: ({ amount, plan, desc }, { emit }) => {
     return (
       <span
@@ -731,12 +599,12 @@ export const paymentBridge = defineBridge({
 
 export const releaseBridge = defineBridge({
   marker: 'release',
-  fields: {
-    name: 'Package or feature name (e.g., zod v3.22)',
-    status: 'Current state: live, beta, planned, or blocked',
-    eta: 'Expected release or current pin (e.g., Stable, Pinned at rc.2)',
-    owner: 'Team or person responsible (e.g., Platform)',
-  },
+  fields: [
+    B.string('name').describe('Package or feature name (e.g., zod v3.22)'),
+    B.enum('status', ['live', 'beta', 'planned', 'blocked']).default('planned'),
+    B.string('eta').describe('Expected release or current pin (e.g., Stable, Pinned at rc.2)').optional(),
+    B.string('owner').describe('Team or person responsible (e.g., Platform)').optional(),
+  ],
   render: ({ name, status, eta, owner }) => {
     const normalized = (status ?? 'planned').trim().toLowerCase();
     const tone = normalized === 'live'
@@ -812,17 +680,17 @@ export const releaseBridge = defineBridge({
 
 export const agentBridge = defineBridge({
   marker: 'agent',
-  fields: {
-    name: 'Agent display name (e.g., CodeSentinel)',
-    role: 'One-line description of the agent\'s purpose',
-    status: 'Current state: done, active, planned, or blocked',
-    latency: 'Time the agent took to run (e.g., 4.2s)',
-    tools: 'Pipe-separated list of tools the agent used (e.g., AST Analysis|Semgrep|Test Runner)',
-    goal: 'Short phrase describing the agent\'s objective',
-  },
+  fields: [
+    B.string('name').describe('Agent display name'),
+    B.string('role').describe('Agent purpose'),
+    B.enum('status', ['done', 'active', 'planned', 'blocked']).default('planned'),
+    B.string('latency').optional().describe('Runtime (e.g. 4.2s)'),
+    B.list('tools', B.string()).optional().describe('Tools used'),
+    B.string('goal').optional().describe('Objective'),
+  ],
   render: ({ name, role, status, latency, tools, goal }) => {
     const tone = getTone(status);
-    const toolList = splitList(tools);
+    const toolList = tools || [];
 
     return (
       <span
@@ -925,13 +793,13 @@ export const agentBridge = defineBridge({
 
 export const signalBridge = defineBridge({
   marker: 'signal',
-  fields: {
-    title: 'Short title describing the finding (e.g., SQL injection in processor.ts:114)',
-    tone: 'Severity level: critical, warning, or positive',
-    score: 'Numeric risk score 0–10 (e.g., 9.4)',
-    trend: 'Status label (e.g., new, resolved, recurring)',
-    note: 'One-sentence explanation of the finding',
-  },
+  fields: [
+    B.string('title').describe('Finding title'),
+    B.enum('tone', ['critical', 'warning', 'positive']).default('warning'),
+    B.number('score').describe('Risk 0-10'),
+    B.string('trend').optional().describe('Status label'),
+    B.string('note').optional(),
+  ],
   render: ({ title, tone, score, trend, note }) => {
     const palette = tone === 'critical'
       ? {
@@ -1021,12 +889,17 @@ export const signalBridge = defineBridge({
   },
 });
 
-export const commandBridge = defineBridge<Record<string, string>>({
+export const commandBridge = defineBridge({
   marker: 'command',
-  pattern: 'keyvalue',
-  prompt: 'Use @command[title: Ops Console, stage: Live, owner: AI Ops, channels: PagerDuty|Slack|Status Page, note: Summary] to show a control-room style command surface.',
+  fields: [
+    B.string('title'),
+    B.string('stage').default('Live'),
+    B.string('owner').optional(),
+    B.list('channels', B.string()).optional(),
+    B.string('note').optional(),
+  ],
   render: ({ title, stage, owner, channels, note }) => {
-    const channelList = splitList(channels);
+    const channelList = channels || [];
 
     return (
       <span
@@ -1088,10 +961,16 @@ export const commandBridge = defineBridge<Record<string, string>>({
   },
 });
 
-export const tickerBridge = defineBridge<Record<string, string>>({
+export const tickerBridge = defineBridge({
   marker: 'ticker',
-  pattern: 'keyvalue',
-  prompt: 'Use @ticker[symbol: NVDA, price: $984.22, move: +3.8%, volume: 42.1M, range: 952-991, thesis: Short note] to show a market ticker summary card.',
+  fields: [
+    B.string('symbol'),
+    B.string('price'),
+    B.string('move').optional(),
+    B.string('volume').optional(),
+    B.string('range').optional(),
+    B.string('thesis').optional(),
+  ],
   render: ({ symbol, price, move, volume, range, thesis }) => {
     const positive = (move ?? '').trim().startsWith('+');
     const negative = (move ?? '').trim().startsWith('-');
@@ -1174,10 +1053,17 @@ export const tickerBridge = defineBridge<Record<string, string>>({
   },
 });
 
-export const positionBridge = defineBridge<Record<string, string>>({
+export const positionBridge = defineBridge({
   marker: 'position',
-  pattern: 'keyvalue',
-  prompt: 'Use @position[symbol: NVDA, side: long, entry: $902, target: $1025, stop: $864, size: 7.5%] to show a portfolio position card.',
+  fields: [
+    B.string('symbol'),
+    B.enum('side', ['long', 'short']).default('long'),
+    B.string('entry').optional(),
+    B.string('target').optional(),
+    B.string('stop').optional(),
+    B.string('size').optional(),
+    B.string('note').optional(),
+  ],
   render: ({ symbol, side, entry, target, stop, size, note }) => {
     const isLong = (side ?? '').trim().toLowerCase() !== 'short';
     const tone = isLong
@@ -1238,10 +1124,16 @@ export const positionBridge = defineBridge<Record<string, string>>({
   },
 });
 
-export const tradeBridge = defineBridge<Record<string, string>>({
+export const tradeBridge = defineBridge({
   marker: 'trade',
-  pattern: 'keyvalue',
-  prompt: 'Use @trade[action: Buy on pullback, window: next 2 sessions, confidence: 78, status: active, note: Summary] to show a trade decision card.',
+  fields: [
+    B.string('action'),
+    B.string('window').optional(),
+    B.number('confidence').optional(),
+    B.enum('status', ['done', 'active', 'planned', 'blocked']).default('planned'),
+    B.string('note').optional(),
+    B.string('catalyst').optional(),
+  ],
   render: ({ action, window, confidence, status, note, catalyst }) => {
     const tone = getTone(status);
     return (
@@ -1280,26 +1172,97 @@ export const tradeBridge = defineBridge<Record<string, string>>({
   },
 });
 
-export const candlesBridge = defineBridge<CandleBridgeData>({
+export const candlesBridge = defineBridge({
   marker: 'candles',
-  pattern: parseCandles,
-  prompt: 'Use @candles[symbol: NVDA; thesis: Note; levels: Support 952|Pivot 968|Target 1025; candles: 2026-04-21:910:956:905:948:36|2026-04-22:948:972:941:966:41] to render a candlestick chart card.',
-  render: (data) => <MarketChartCard data={data} />,
+  fields: [
+    B.string('symbol'),
+    B.string('thesis').optional(),
+    B.list('levels', B.string()).optional().describe('Label Price (e.g. Support 950)'),
+    B.list('candles', B.string()).describe('date:open:high:low:close:volume'),
+  ],
+  render: ({ symbol, thesis, levels, candles }) => {
+    const candleData = (candles || [])
+      .map((item) => {
+        const [time, open, high, low, close, volume] = item.split(':').map((part) => part.trim());
+        return {
+          time,
+          open: Number(open),
+          high: Number(high),
+          low: Number(low),
+          close: Number(close),
+          volume: volume ? Number(volume) : undefined,
+        };
+      })
+      .filter((item) => item.time && [item.open, item.high, item.low, item.close].every((value) => !Number.isNaN(value)));
+ 
+    return (
+      <MarketChartCard
+        data={{
+          symbol,
+          thesis,
+          levels,
+          candles: candleData,
+        }}
+      />
+    );
+  },
 });
 
-export const servicemapBridge = defineBridge<FlowBridgeData>({
+export const servicemapBridge = defineBridge({
   marker: 'servicemap',
-  pattern: parseFlowBridge,
-  prompt: 'Use @servicemap[title: Checkout dependency map; note: Summary; nodes: gateway,Edge Gateway,0,90,active,2.1k rpm|auth,Auth Service,220,0,done,p95 220ms; edges: gateway>auth>Auth path] to render a service dependency graph.',
-  render: (data) => <FlowCard {...data} />,
+  fields: [
+    B.string('title').optional(),
+    B.string('note').optional(),
+    B.list('nodes', B.string()).describe('id,label,x,y,status,meta'),
+    B.list('edges', B.string()).describe('source>target>label'),
+  ],
+  render: ({ title, note, nodes, edges }) => {
+    const flowNodes = (nodes || []).map((item, index) => {
+      const [id, label, x, y, status, meta] = item.split(',').map((part) => part.trim());
+      return {
+        id: id || `node-${index}`,
+        label: label || id || `Node ${index + 1}`,
+        x: Number(x ?? 0),
+        y: Number(y ?? 0),
+        status,
+        meta,
+      };
+    }).filter((item) => !Number.isNaN(item.x) && !Number.isNaN(item.y));
+ 
+    const flowEdges = (edges || []).map((item, index) => {
+      const [source, target, label] = item.split('>').map((part) => part.trim());
+      return {
+        id: `edge-${index}-${source}-${target}`,
+        source,
+        target,
+        label,
+      };
+    }).filter((edge) => edge.source && edge.target);
+ 
+    return <FlowCard title={title} note={note} nodes={flowNodes} edges={flowEdges} />;
+  },
 });
-
-export const pipelineflowBridge = defineBridge<PipelineStageData>({
+ 
+export const pipelineflowBridge = defineBridge({
   marker: 'pipelineflow',
-  pattern: parsePipeline,
-  prompt: 'Use @pipelineflow[title: Enterprise pipeline; note: Summary; stages: Sourced,$2.8M,182,done|Qualified,$1.7M,96,active|Proposal,$740k,41,planned] to render a revenue flow board.',
-  render: (data) => {
-    const nodes = data.stages.map((stage, index) => ({
+  fields: [
+    B.string('title').optional(),
+    B.string('note').optional(),
+    B.list('stages', B.string()).describe('label,amount,count,status'),
+  ],
+  render: ({ title, note, stages }) => {
+    const stageData = (stages || []).map((item, index) => {
+      const [label, amount, count, status] = item.split(',').map((part) => part.trim());
+      return {
+        id: `stage-${index}`,
+        label: label || `Stage ${index + 1}`,
+        amount: amount || '—',
+        count: count || '—',
+        status,
+      };
+    });
+ 
+    const nodes = stageData.map((stage, index) => ({
       id: stage.id,
       label: stage.label,
       x: index * 220,
@@ -1307,58 +1270,56 @@ export const pipelineflowBridge = defineBridge<PipelineStageData>({
       status: stage.status,
       meta: `${stage.amount} • ${stage.count}`,
     }));
-    const edges = data.stages.slice(0, -1).map((stage, index) => ({
+ 
+    const edges = stageData.slice(0, -1).map((stage, index) => ({
       id: `pipeline-edge-${index}`,
       source: stage.id,
-      target: data.stages[index + 1]!.id,
-      label: index < data.stages.length - 1 ? `${Math.max(0, 100 - (index * 14))}%` : undefined,
+      target: stageData[index + 1]!.id,
+      label: index < stageData.length - 1 ? `${Math.max(0, 100 - (index * 14))}%` : undefined,
     }));
-    return <FlowCard title={data.title} note={data.note} nodes={nodes} edges={edges} />;
+ 
+    return <FlowCard title={title} note={note} nodes={nodes} edges={edges} />;
   },
 });
 
 export const gaugeBridge = defineBridge({
   marker: 'gauge',
-  fields: {
-    label: 'Metric name shown below the arc (e.g., Billing Module)',
-    value: 'Current numeric value (e.g., 48)',
-    max: 'Maximum value for the scale (e.g., 100)',
-    unit: 'Unit suffix displayed after the value (e.g., %)',
-    warn: 'Warning threshold — value below this shows amber (e.g., 75)',
-    crit: 'Critical threshold — value below this shows red (e.g., 65)',
-  },
+  fields: [
+    B.string('label'),
+    B.number('value'),
+    B.number('max').default(100),
+    B.string('unit').optional(),
+    B.number('warn').default(75),
+    B.number('crit').default(60),
+  ],
   render: ({ label, value, max, unit, warn, crit }) => {
     const numValue = Number(value ?? 0);
     const numMax = Number(max ?? 100);
     const numWarn = Number(warn ?? 75);
     const numCrit = Number(crit ?? 60);
-    const pct = Math.min(99.99, Math.max(0, (numValue / numMax) * 100));
+    
+    const safeValue = Number.isNaN(numValue) ? 0 : numValue;
+    const safeMax = Number.isNaN(numMax) || numMax === 0 ? 100 : numMax;
+    const pct = Math.min(99.99, Math.max(0, (safeValue / safeMax) * 100));
 
-    const color =
-      numValue < numCrit ? '#ef4444' :
-      numValue < numWarn ? '#f59e0b' :
-      '#22c55e';
+    const color = numValue < numCrit
+      ? '#ef4444'
+      : numValue < numWarn
+        ? '#f59e0b'
+        : '#22c55e';
 
-    // Half-circle arc — centre (60, 56), radius 46
-    // Arc goes from left (14, 56) to right (106, 56), sweeping upward (clockwise, flag=1)
-    const cx = 60, cy = 56, r = 46;
-    const startX = cx - r, arcY = cy;
-    const endX = cx + r;
+    const cx = 70;
+    const cy = 74;
+    const r = 56;
+    const startX = cx - r;
+    const startY = cy;
 
-    // Value endpoint: angle α from positive-x axis.
-    // At pct=0  → α=π  (left end)
-    // At pct=100 → α=0  (right end)
-    const alpha = Math.PI * (1 - pct / 100);
-    const vEndX = cx + r * Math.cos(alpha);
-    const vEndY = cy - r * Math.sin(alpha);
+    const theta = Math.PI - (pct / 100) * Math.PI;
+    const endX = cx + r * Math.cos(theta);
+    const endY = cy - r * Math.sin(theta);
 
-    // A half-circle gauge arc is always ≤ 180° — large-arc flag is always 0.
-    const trackPath = `M ${startX} ${arcY} A ${r} ${r} 0 1 1 ${endX} ${arcY}`;
-    const valuePath = pct > 0
-      ? `M ${startX} ${arcY} A ${r} ${r} 0 0 1 ${vEndX.toFixed(2)} ${vEndY.toFixed(2)}`
-      : null;
-
-    const statusLabel = numValue < numCrit ? 'Critical' : numValue < numWarn ? 'Warning' : 'Healthy';
+    const trackPath = `M ${startX} ${startY} A ${r} ${r} 0 0 1 ${cx + r} ${startY}`;
+    const valuePath = pct > 0 ? `M ${startX} ${startY} A ${r} ${r} 0 0 1 ${endX.toFixed(2)} ${endY.toFixed(2)}` : null;
 
     return (
       <span
@@ -1367,50 +1328,29 @@ export const gaugeBridge = defineBridge({
           display: 'inline-flex',
           flexDirection: 'column',
           alignItems: 'center',
-          verticalAlign: 'top',
-          margin: '0.3rem 0.5rem 0.3rem 0',
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '1rem',
-          padding: '0.85rem 1rem 0.75rem',
-          boxShadow: 'var(--shadow-xs)',
-          minWidth: 140,
+          verticalAlign: 'middle',
+          margin: '0.25rem 0.4rem',
+          gap: '0.1rem',
         }}
       >
-        <svg width={120} height={70} viewBox="0 0 120 70" style={{ overflow: 'visible', display: 'block' }}>
-          {/* Track */}
-          <path d={trackPath} fill="none" stroke="var(--border)" strokeWidth="8" strokeLinecap="round" />
-          {/* Value arc */}
+        <svg width={140} height={80} viewBox="0 0 140 80" style={{ overflow: 'visible' }}>
+          <path d={trackPath} fill="none" stroke="var(--border)" strokeWidth="9" strokeLinecap="round" />
           {valuePath && (
-            <path d={valuePath} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round" />
+            <path d={valuePath} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round" />
           )}
-          {/* Needle tip dot */}
-          {valuePath && (
-            <circle cx={vEndX} cy={vEndY} r="4.5" fill={color} />
-          )}
-          {/* Value + unit */}
-          <text x={cx} y={cy + 6} textAnchor="middle" fontSize="19" fontWeight="800" fill="var(--text)" fontFamily="inherit">
-            {numValue}{unit ?? ''}
+          <text x={cx} y={cy - 6} textAnchor="middle" fontSize="18" fontWeight="800" fill="var(--text)" fontFamily="inherit">
+            {safeValue}{unit ?? ''}
           </text>
-          {/* 0 / max tick labels */}
-          <text x={startX} y={arcY + 16} textAnchor="middle" fontSize="9" fill="var(--text-muted)" fontFamily="inherit">0</text>
-          <text x={endX} y={arcY + 16} textAnchor="middle" fontSize="9" fill="var(--text-muted)" fontFamily="inherit">{numMax}</text>
+          <text x={cx} y={cy + 10} textAnchor="middle" fontSize="10" fill="var(--text-muted)" fontFamily="inherit">
+            {label ?? 'Metric'}
+          </text>
+          <text x={startX + 2} y={cy + 18} textAnchor="middle" fontSize="9" fill="var(--text-muted)" fontFamily="inherit">
+            0
+          </text>
+          <text x={cx + r - 2} y={cy + 18} textAnchor="middle" fontSize="9" fill="var(--text-muted)" fontFamily="inherit">
+            {safeMax}
+          </text>
         </svg>
-        {/* Metric label */}
-        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center', marginTop: '0.35rem', lineHeight: 1.3 }}>
-          {label ?? 'Metric'}
-        </span>
-        {/* Status badge */}
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-          fontSize: '0.65rem', fontWeight: 700, color,
-          background: `color-mix(in srgb, ${color} 14%, var(--surface))`,
-          border: `1px solid color-mix(in srgb, ${color} 28%, var(--border))`,
-          borderRadius: '9999px', padding: '0.12em 0.55em', marginTop: '0.35rem',
-        }}>
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: color, flexShrink: 0 }} />
-          {statusLabel}
-        </span>
       </span>
     );
   },
@@ -1418,16 +1358,27 @@ export const gaugeBridge = defineBridge({
 
 export const fileheatBridge = defineBridge({
   marker: 'fileheat',
-  fields: {
-    title: 'Short label for the changeset (e.g., "47 files changed")',
-    files: 'Pipe-separated file list: path:intensity:type where intensity is 0-100 and type is added/modified/deleted. Example: src/auth.ts:85:modified|src/checkout.ts:42:added',
-  },
-  render: ({ title, files: filesStr }) => {
-    const files = (filesStr ?? '').split('|').map(item => {
-      const parts = item.trim().split(':');
-      return { path: parts[0]?.trim() ?? '', intensity: Number(parts[1] ?? 0), type: parts[2]?.trim() ?? 'modified' };
+  fields: [
+    B.string('title').optional(),
+    B.list('files', B.string()).describe('Format: path:intensity:type'),
+  ],
+  render: ({ title, files: filesList }) => {
+    // Handle both new comma-split list and legacy pipe-split strings
+    const rawItems = (filesList || []);
+    const items = rawItems.flatMap(item => {
+      if (typeof item === 'string' && item.includes('|')) return item.split('|');
+      return [item];
+    });
+ 
+    const files = items.map(item => {
+      const parts = String(item).trim().split(':');
+      return { 
+        path: parts[0]?.trim() ?? '', 
+        intensity: Number(parts[1] ?? 50), 
+        type: (parts[2]?.trim() ?? 'modified') as 'added' | 'modified' | 'deleted' 
+      };
     }).filter(f => f.path);
-
+ 
     if (!files.length) return null;
 
     const maxIntensity = Math.max(...files.map(f => f.intensity), 1);

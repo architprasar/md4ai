@@ -1,5 +1,5 @@
 import type { BridgeDefinition } from './bridge.js';
-import { getBridgePrompt, type GetBridgePromptOptions } from './bridge.js';
+import { getBridgePrompt, getBridgeProtocolPrompt, type GetBridgePromptOptions } from './bridge.js';
 
 export const builtinPromptTopics = [
   'callouts',
@@ -26,53 +26,53 @@ type TopicPromptConfig = {
 const BUILTIN_PROMPTS: Record<BuiltinPromptTopic, TopicPromptConfig> = {
   callouts: {
     minimal: 'For emphasis, use GitHub-style callouts like > [!NOTE], > [!TIP], > [!WARNING], > [!DANGER], or > [!INFO].',
-    standard: 'Use GitHub-style callouts for emphasis and recommendations: > [!NOTE], > [!TIP], > [!WARNING], > [!DANGER], or > [!INFO].',
+    standard: 'Use GitHub-style callouts for emphasis: > [!NOTE], > [!TIP], > [!WARNING], > [!DANGER], or > [!INFO].',
     example: '> [!NOTE]\n> Important context here.',
   },
   charts: {
-    minimal: 'For charts, use ```chart fenced blocks with JSON chart config.',
-    standard: 'Use ```chart fenced blocks with JSON chart config for bar, line, pie, doughnut, or radar charts. If unsure, fall back to a table instead of inventing chart syntax.',
+    minimal: 'For charts, use ```chart blocks with JSON config.',
+    standard: 'Use ```chart fenced blocks with JSON config for bar, line, pie, doughnut, or radar charts.',
     example: '```chart\n{\n  "type": "bar",\n  "labels": ["North", "South"],\n  "datasets": [{ "label": "Revenue", "data": [142, 98] }]\n}\n```',
   },
   steps: {
     minimal: 'For workflows or plans, use ```steps or ```timeline blocks with statuses like done, active, planned, or blocked.',
-    standard: 'Use ```steps or ```timeline fenced blocks for workflows, plans, and chronological progress. Use only these statuses: done, active, planned, blocked. If unsure, fall back to planned.',
-    example: '```steps\n- [done] Gather requirements\n- [active] Build parser support\n  Accept partial syntax during streaming\n- [planned] Ship docs\n```',
+    standard: 'Use ```steps or ```timeline fenced blocks for workflows and plans. Use statuses: done, active, planned, blocked.',
+    example: '```steps\n- [done] Initial plan\n- [active] Implementation\n- [planned] Release\n```',
   },
   kpi: {
-    minimal: 'For headline metrics, use ::kpi{label="...", value="...", change="...", period="..."}.',
-    standard: 'Use ::kpi{label="...", value="...", change="...", period="..."} for headline metrics and stat cards. Keep label and value short and concrete.',
-    example: '::kpi{label="Revenue" value="$167k" change="+18%" period="QoQ"}',
+    minimal: 'For headline metrics, use @kpi["label", "value", change: "...", period: "..."].',
+    standard: 'Use @kpi["label", "value", change: "...", period: "..."] for headline metrics and stat cards.',
+    example: '@kpi["Revenue", "$167k", change: "+18%", period: "QoQ"]',
   },
   cards: {
-    minimal: 'For highlighted summaries, use :::card{title="..."} ... :::.',
-    standard: 'Use :::card{title="..."} ... ::: for highlighted summary cards, focused action blocks, or short recommendations.',
-    example: ':::card{title="Immediate action"}\nSchedule a follow-up with the South region team.\n:::',
+    minimal: 'For highlighted summaries, use @card["title"] followed by content.',
+    standard: 'Use @card["title"] followed by a content block for focused summaries or recommendations.',
+    example: '@card["Immediate action"]\nSchedule a follow-up with the team.',
   },
   layout: {
-    minimal: 'For side-by-side summaries, use ```layout columns=2 fenced blocks with --- separators.',
-    standard: 'Use ```layout columns=2 fenced blocks with --- separators to create multi-column summaries. If you only need one column, use normal markdown instead.',
-    example: '```layout columns=2\n### Strengths\n- Clear enterprise pull\n\n---\n\n### Risks\n- Mobile parity is slipping\n```',
+    minimal: 'For side-by-side summaries, use ```layout columns=2 blocks with --- separators.',
+    standard: 'Use ```layout columns=2 fenced blocks with --- separators to create multi-column summaries.',
+    example: '```layout columns=2\n### Column 1\nContent\n\n---\n\n### Column 2\nContent\n```',
   },
   buttons: {
-    minimal: 'For actions, use ::button[label]{href="...", variant="primary|secondary|default"}.',
-    standard: 'Use ::button[label]{href="...", variant="primary|secondary|default"} for inline call-to-action buttons.',
-    example: '::button[Export report]{href="#" variant="primary"}',
+    minimal: 'For actions, use @button["label", href: "...", variant: "primary|secondary|default"].',
+    standard: 'Use @button["label", href: "...", variant: "primary|secondary|default"] for call-to-action buttons.',
+    example: '@button["Export", href: "#", variant: "primary"]',
   },
   inputs: {
-    minimal: 'For lightweight follow-up fields, use ::input{type="text", placeholder="...", label="..."}.',
-    standard: 'Use ::input{type="text", placeholder="...", label="..."} for lightweight prompt fields and follow-ups.',
-    example: '::input{type="text" placeholder="Ask a follow-up..." label="Follow-up"}',
+    minimal: 'For follow-up fields, use @input["label", type: "text", placeholder: "..."].',
+    standard: 'Use @input["label", type: "text", placeholder: "..."] for prompt fields and follow-ups.',
+    example: '@input["Follow-up", type: "text", placeholder: "Ask a question..."]',
   },
   video: {
-    minimal: 'For video embeds, use ```video fenced blocks with a video URL.',
-    standard: 'Use ```video fenced blocks with a video URL. YouTube and Vimeo links render as embeds; other URLs render as native video.',
+    minimal: 'For video embeds, use ```video blocks with a URL.',
+    standard: 'Use ```video fenced blocks with a URL (YouTube, Vimeo, or direct links).',
     example: '```video\nhttps://www.youtube.com/watch?v=dQw4w9WgXcQ\n```',
   },
   tables: {
     minimal: 'For comparisons and summaries, use normal markdown tables.',
-    standard: 'Use standard markdown tables for comparisons, reports, and summaries; md4ai enhances their presentation automatically.',
-    example: '| Metric | Value |\n| --- | --- |\n| Revenue | $167k |\n| Change | +18% |',
+    standard: 'Use standard markdown tables; they are enhanced automatically.',
+    example: '| Metric | Value |\n| --- | --- |\n| Revenue | $167k |',
   },
 };
 
@@ -100,12 +100,12 @@ function matchesTopicSelector(
 
 function getBaseInstruction(mode: PromptMode): string {
   if (mode === 'minimal') {
-    return 'Write normal markdown by default. Use md4ai syntax only when it clearly improves the response. If unsure, fall back to plain markdown. Never invent unsupported directives or markers.';
+    return 'Write standard markdown by default. Use md4ai extensions only when they clearly improve the response. Never invent unsupported syntax.';
   }
   if (mode === 'withExamples') {
-    return 'Write standard markdown by default. When richer presentation clearly improves the answer, you may use md4ai markdown extensions instead of JSON or JSX. If unsure about syntax, fall back to plain markdown rather than inventing unsupported directives or markers. Follow the examples exactly when using md4ai syntax.';
+    return 'Write standard markdown by default. When richer presentation improves the answer, use md4ai extensions instead of JSON or JSX. Follow the syntax examples exactly. If unsure, fall back to plain markdown.';
   }
-  return 'Write standard markdown by default. When richer presentation helps, you may use md4ai markdown extensions instead of JSON or JSX. If unsure about syntax, fall back to plain markdown rather than inventing unsupported directives or markers.';
+  return 'Write standard markdown by default. When richer presentation helps, you may use md4ai extensions instead of JSON or JSX. If unsure about syntax, fall back to plain markdown rather than inventing unsupported directives or markers.';
 }
 
 function getTopicPrompt(topic: BuiltinPromptTopic, mode: PromptMode): string {
@@ -138,6 +138,10 @@ export function getPrompt(options: GetPromptOptions = {}): string {
   }
 
   if (options.includeBridgePrompts !== false && options.bridges?.length) {
+    // Tier 1: Protocol (Universal Rules)
+    sections.push(getBridgeProtocolPrompt());
+
+    // Tier 2: Catalog (Component-specific definitions)
     const bridgePrompt = getBridgePrompt(options.bridges, {
       include: options.includeBridges,
       exclude: options.excludeBridges,

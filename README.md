@@ -21,6 +21,60 @@ md4ai takes a different approach: **extend markdown itself.** The AI writes mark
 
 Another practical advantage: this often saves tokens compared to custom JSON UI schemas. Markdown plus compact directives like `::kpi{...}` or `@release[...]` is usually smaller than nested `type/props/content` JSON, and it also reduces repair-cost tokens from malformed structured output.
 
+## Bridge System (AI-Native Components)
+
+Instead of complex JSON schemas, `md4ai` uses a **dType Schema API** to define component interfaces. 
+
+- **Automatic Casting**: Converts raw strings to `number`, `boolean`, `Array`, or `Record`.
+- **Hybrid Syntax**: AI can use positional arguments, named keys, or a mix of both.
+- **Recursive Parsing**: Lists and Key-Values recursively parse their children.
+- **Smart Delimiters**: Lists automatically detect the best separator (`|` or `,`).
+
+### Example: Defining a Bridge
+
+```tsx
+import { defineBridge, B } from '@architprasar/md4ai/core';
+
+const kpiBridge = defineBridge({
+  marker: 'kpi',
+  fields: [
+    B.string('label').describe('The metric name'),
+    B.string('value').describe('Current value'),
+    B.number('change').optional(),
+  ],
+  render: ({ label, value, change }) => (
+    <div className="kpi-card">
+      <h4>{label}</h4>
+      <strong>{value}</strong>
+      {change && <span>{change > 0 ? '+' : ''}{change}%</span>}
+    </div>
+  )
+});
+```
+
+### AI Output Examples
+
+The model can emit any of these; the parser handles them all:
+
+- **Positional**: `@kpi["Revenue", "$1.2M", 14]`
+- **Named**: `@kpi[label: "Revenue", value: "$1.2M", change: 14]`
+- **Hybrid**: `@kpi["Revenue", "$1.2M", change: 14]`
+- **Complex Lists**: `@sparkline[|10, 20, 15, 30, 25|]`
+
+## Two-Tier Prompting
+
+Keep your system prompts small by separating the universal protocol from the component manifest.
+
+```ts
+import { getBridgeProtocolPrompt, getPrompt } from '@architprasar/md4ai/core';
+
+// 1. The universal bridge syntax rules
+const protocol = getBridgeProtocolPrompt();
+
+// 2. The manifest of markers and fields (Catalog)
+const catalog = getPrompt({ bridges, mode: 'minimal' });
+```
+
 ---
 
 ## Quickstart
@@ -203,6 +257,8 @@ Schedule a call with South region AEs. Pull exit survey data first.
 
 Variants: `primary` `secondary` `default`
 
+> **Note:** remark-directive attribute syntax uses spaces between attributes, not commas.
+
 ---
 
 ### Inputs
@@ -235,6 +291,62 @@ Standard GFM syntax — rendered with visual checkboxes.
 - [ ] Schedule South region review call
 - [ ] Draft Q2 forecast model
 ```
+
+---
+
+### Inline bridges
+
+md4ai ships 16 ready-made bridge markers for AI product surfaces. Use any of them by adding the corresponding bridge definition to your `BRIDGES` array. See [`docs/bridges.md`](./docs/bridges.md) for the full field reference.
+
+**General purpose**
+
+```markdown
+@kpi["Revenue", "$167k", change: +18%, period: QoQ]
+ 
+@sparkline[|38, 41, 45, 49, 58, 62, 71|]
+ 
+@timeline[|Discovery: done, Design: done, Build: active, Launch: planned|]
+ 
+@release["zod v3.22", status: beta, eta: "Pinned at rc.2", owner: Platform]
+ 
+@gauge["Checkout Processor", 61, max: 100, unit: %, warn: 75, crit: 65]
+ 
+@signal["SQL injection", tone: critical, score: 9.4, trend: new, note: "Parameterized query required."]
+ 
+@fileheat["47 files", |src/checkout/processor.ts:98:modified, src/auth/session.ts:71:added|]
+ 
+@payment["$79", "CodeSentinel Pro", desc: "Automatic merge blocking and auto-fix PRs."]
+```
+
+**AI agent surfaces**
+
+```markdown
+@agent[name: CodeSentinel, role: Security Reviewer, status: done, latency: 4.2s, tools: AST Analysis|Semgrep, goal: Block insecure merges]
+
+@command[title: Ops Console, stage: Live, owner: AI Ops, channels: PagerDuty|Slack, note: All clear.]
+```
+
+**Trading / market data**
+
+```markdown
+@ticker[symbol: NVDA, price: $984.22, move: +3.8%, volume: 42.1M, range: 952-991]
+
+@position[symbol: NVDA, side: long, entry: $902, target: $1025, stop: $864, size: 7.5%]
+
+@trade[action: Buy on pullback, window: next 2 sessions, confidence: 78, status: active]
+
+@candles[symbol: NVDA; thesis: Support holding at $952; candles: 2026-04-21:910:956:905:948:36|2026-04-22:948:972:941:966:41]
+```
+
+**Architecture / infra**
+
+```markdown
+@servicemap[title: Checkout graph; nodes: api,API Layer,0,80,active|validator,Validator,220,0,done; edges: api>validator>validate]
+
+@pipelineflow[title: Q2 Pipeline; stages: Sourced,$2.8M,182,done|Qualified,$1.7M,96,active|Proposal,$740k,41,planned]
+```
+
+Bridge markers that use semicolons as field delimiters (`candles`, `servicemap`, `pipelineflow`) do so because their values contain commas internally. See [`docs/bridges.md`](./docs/bridges.md) for all fields and formats.
 
 ---
 
@@ -276,20 +388,32 @@ Project status: @timeline[Discovery: done, Design: done, Build: active, Launch: 
 ---
 
 ### Define a bridge
-
+ 
 ```tsx
-import { defineBridge } from '@architprasar/md4ai/core';
-
-const statusBridge = defineBridge({
-  marker: 'status',
-  pattern: 'scalar',                 // matches @status[value]
-  render: (value) => (
-    <span className={`badge badge--${value}`}>{value}</span>
+import { defineBridge, B } from '@architprasar/md4ai/core';
+ 
+// Use B.type() to define a fluent, positional-aware schema
+const releaseBridge = defineBridge({
+  marker: 'release',
+  fields: [
+    B.string('name').describe('Package name (e.g., zod)'),
+    B.enum('status', ['live', 'beta', 'planned']).default('planned'),
+  ],
+  render: ({ name, status }) => (
+    <ReleaseBadge name={name} status={status} />
   ),
 });
 ```
-
-`defineBridge()` now validates marker names up front, and if a custom parser throws, the token falls back to its raw payload instead of breaking `parse()`.
+ 
+`defineBridge()` now accepts an array of **dTypes**. The order in the array defines the positional arguments.
+ 
+### Prompt generation
+ 
+md4ai uses a two-tier prompting system (**Protocol & Catalog**) to save tokens.
+- **Protocol**: One-time rules for universal bridge syntax (brackets, lists, spacing).
+- **Catalog**: A compressed manifest of available markers and their fields.
+ 
+Use `getBridgeProtocolPrompt()` to get the Tier 1 instructions, and the system handles the rest.
 
 ### Register it
 
@@ -595,9 +719,10 @@ See [`docs/production.md`](./docs/production.md) for production patterns using `
 | Option | Type | Description |
 |--------|------|-------------|
 | `marker` | `string` | The `@marker` name — lowercase, letters and hyphens only |
-| `pattern` | `'scalar' \| 'array' \| 'keyvalue' \| 'range' \| (raw) => T` | How to parse the `[data]` content |
+| `fields` | `BridgeField[]` | Fluent array of dTypes (e.g. `[B.string('id'), B.number('val')]`) |
 | `render` | `(data: T, ctx: BridgeRenderCtx) => ReactElement \| null` | Renders the component |
 | `prompt` | `string` | Overrides the auto-generated AI system prompt hint |
+| `onParseError` | `(raw, error) => T` | Safe fallback when a custom parser throws |
 
 ### `themes`
 

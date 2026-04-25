@@ -35,6 +35,7 @@ export const DOCS_NAV: { label: string; id: string; children?: { label: string; 
     children: [
       { label: 'Live Bridge Demo', id: 'bridge-demo' },
       { label: 'Define', id: 'bridge-define' },
+      { label: 'Fields', id: 'bridge-fields' },
       { label: 'Patterns', id: 'bridge-patterns' },
       { label: 'Register', id: 'bridge-register' },
       { label: 'Host Data', id: 'bridge-host' },
@@ -84,16 +85,13 @@ Implementation | active | Core renderer work is already in review
 QA | planned
 Launch | planned
 \`\`\``,
-  kpis: `::kpi{label="Quarterly Revenue" value="$2.48M" change="+14%" period="QoQ"}
-::kpi{label="Net Retention" value="112%" change="+3 pts" period="YoY"}
-::kpi{label="Launch Confidence" value="78%" change="-4 pts" period="30 days"}`,
-  cards: `:::card{title="Immediate action"}
+  kpis: `@kpi["Quarterly Revenue", "$2.48M", change: "+14%", period: "QoQ"]
+@kpi["Net Retention", "112%", change: "+3 pts", period: "YoY"]
+@kpi["Launch Confidence", "78%", change: "-4 pts", period: "30 days"]`,
+  cards: `@card["Immediate action"]
 Prioritize the mobile parity recovery plan before adding new roadmap scope.
-:::
-
-:::card{title="Leadership note"}
-Reporting foundations are the dependency for three separate launches.
-:::`,
+@card["Leadership note"]
+Reporting foundations are the dependency for three separate launches.`,
   layout: `\`\`\`layout columns=2
 ### Strengths
 - AI workspace demand is strong
@@ -105,11 +103,11 @@ Reporting foundations are the dependency for three separate launches.
 - Mobile parity is slipping
 - Export job reliability still needs follow-up
 \`\`\``,
-  buttons: `::button[Export roadmap brief]{href="#" variant="primary"}
-::button[Open delivery review]{href="#" variant="secondary"}
-::button[Download CSV]{href="#" variant="default"}
+  buttons: `@button["Export roadmap brief", href: "#", variant: "primary"]
+@button["Open delivery review", href: "#", variant: "secondary"]
+@button["Download CSV", href: "#", variant: "default"]
 
-::input{type="text" placeholder="Ask for a deeper breakdown..." label="Follow-up"}`,
+@input["Follow-up", type: "text", placeholder: "Ask for a deeper breakdown..."]`,
   video: `\`\`\`video
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
 \`\`\``,
@@ -123,15 +121,15 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
 | Reporting Foundations | Platform | 76% | Active |
 | Mobile Parity | Mobile | 61% | At risk |
 | Total | Product Org | 78% | Stable |`,
-  bridge: `The next release is @release[name: Agent Inbox, status: beta, eta: July 2026, owner: Core UX].
-
-If launch confidence drops, mark it as @release[name: Mobile parity, status: blocked, eta: TBD, owner: Mobile].`,
+  bridge: `The next release is @release["Agent Inbox", beta, eta: "July 2026", owner: "Core UX"].
+ 
+If launch confidence drops, mark it as @release["Mobile parity", blocked, eta: TBD, owner: Mobile].`,
 };
 
 const ROADMAP_DEMO = `## Product Review
 
-::kpi{label="Launch confidence" value="78%" change="-4 pts" period="This month"}
-::kpi{label="Critical risks" value="3" change="+1" period="Current"}
+@kpi["Launch confidence", "78%", change: "-4 pts", period: "This month"]
+@kpi["Critical risks", "3", change: "+1", period: "Current"]
 
 \`\`\`steps
 - [done] Lock roadmap themes
@@ -159,7 +157,7 @@ export function DocsHeroSection() {
             <a href="./index.html" className="btn-icon" style={{ textDecoration: 'none' }}>Open playground</a>
             <a href="https://github.com/architprasar/md4ai" className="btn-icon" style={{ textDecoration: 'none' }}>GitHub</a>
           </div>
-          <Code>{`import { parse, parseStreaming, defineBridge } from '@architprasar/md4ai/core';
+          <Code>{`import { parse, parseStreaming, defineBridge, B } from '@architprasar/md4ai/core';
 import { renderContent, themes } from '@architprasar/md4ai/react';`}</Code>
         </div>
         <div className="playground-intro__meta">
@@ -205,7 +203,7 @@ npm install react react-dom
 npm install chart.js`}</Code>
 
       <H2 id="quickstart">Quickstart</H2>
-      <Code>{`import { parse } from '@architprasar/md4ai/core';
+      <Code>{`import { parse, defineBridge, B } from '@architprasar/md4ai/core';
 import { renderContent } from '@architprasar/md4ai/react';
 
 function AIMessage({ content }: { content: string }) {
@@ -274,7 +272,7 @@ export function SyntaxSection({ docsTheme }: { docsTheme: DocsTheme }) {
       <InteractiveDemo title="Live callout demo" description="Edit GitHub-style alert markdown and watch md4ai render the richer callout UI." initial={LIVE_DEMOS.callouts} theme={docsTheme} minHeight={210} />
 
       <H3 id="charts">Charts</H3>
-      <P>Fenced code block with <IC>chart</IC> lang. Uses Chart.js under the hood — install it separately. During streaming, an animated skeleton placeholder renders until the JSON is complete.</P>
+      <P>Fenced code block with <IC>chart</IC> lang. Uses Chart.js under the hood — install it separately. During streaming, an animated shimmer skeleton placeholder renders until the JSON is complete.</P>
       <Code>{LIVE_DEMOS.charts}</Code>
       <P>Supported types: <IC>bar</IC> <IC>line</IC> <IC>pie</IC> <IC>doughnut</IC> <IC>radar</IC></P>
       <Callout type="note">chart.js must be installed separately: <IC>npm install chart.js</IC>. If it is missing, chart fences render as a skeleton placeholder.</Callout>
@@ -287,7 +285,7 @@ export function SyntaxSection({ docsTheme }: { docsTheme: DocsTheme }) {
       <InteractiveDemo title="Live steps and timeline demo" description="Try the forgiving status formats and see how partial plans still render cleanly." initial={LIVE_DEMOS.steps} theme={docsTheme} minHeight={280} />
 
       <H3 id="kpi-metrics">KPI Metrics</H3>
-      <P>Use <IC>::kpi</IC> for a first-class metric block.</P>
+      <P>Use <IC>@kpi</IC> for a first-class metric card.</P>
       <Code>{LIVE_DEMOS.kpis}</Code>
       <InteractiveDemo title="Live KPI demo" description="Tune labels, values, deltas, and periods to see how the metric cards adapt." initial={LIVE_DEMOS.kpis} theme={docsTheme} minHeight={220} />
 
@@ -301,9 +299,9 @@ export function SyntaxSection({ docsTheme }: { docsTheme: DocsTheme }) {
       <InteractiveDemo title="Live layout demo" description="Turn one markdown block into a balanced multi-column summary section." initial={LIVE_DEMOS.layout} theme={docsTheme} minHeight={250} />
 
       <H3 id="buttons">Buttons</H3>
-      <Code>{`::button[Export Report]{href="#" variant="primary"}
-::button[Build Forecast]{href="/forecast" variant="secondary"}
-::button[Download CSV]{href="/export" variant="default"}`}</Code>
+      <Code>{`@button["Export Report", href: "#", variant: "primary"]
+@button["Build Forecast", href: "/forecast", variant: "secondary"]
+@button["Download CSV", href: "/export", variant: "default"]`}</Code>
       <Table head={['Variant', 'Style']} rows={[
         ['<code>primary</code>', 'Accent fill'],
         ['<code>secondary</code>', 'Surface with border'],
@@ -312,8 +310,8 @@ export function SyntaxSection({ docsTheme }: { docsTheme: DocsTheme }) {
       <InteractiveDemo title="Live buttons and input demo" description="Test action bars and lightweight form prompts inside the same markdown response." initial={LIVE_DEMOS.buttons} theme={docsTheme} minHeight={230} />
 
       <H3 id="inputs">Inputs</H3>
-      <Code>{`::input{type="text" placeholder="Ask a follow-up..." label="Follow-up"}
-::input{type="email" placeholder="you@company.com" label="Work email"}`}</Code>
+      <Code>{`@input["Follow-up", type: "text", placeholder: "Ask a follow-up..."]
+@input["Work email", type: "email", placeholder: "you@company.com"]`}</Code>
 
       <H3 id="video">Video Embeds</H3>
       <P>YouTube and Vimeo URLs become responsive 16:9 iframes. Any other URL renders a native <IC>{`<video>`}</IC> element.</P>
@@ -348,82 +346,77 @@ export function BridgesSection({ docsTheme }: { docsTheme: DocsTheme }) {
       <Callout type="tip">
         <IC>@</IC> only fires as a bridge marker when followed by <IC>word[</IC>. Bare mentions like <IC>@john</IC> and emails like <IC>user@company.com</IC> are never matched.
       </Callout>
-
+ 
       <H3 id="bridge-demo">Live bridge demo</H3>
       <P>The docs demo includes a custom bridge called <IC>release</IC>.</P>
       <Table head={['Piece', 'Example']} rows={[
-        ['Marker syntax', '<code>@release[name: Agent Inbox, status: beta, eta: July 2026, owner: Core UX]</code>'],
-        ['Pattern', '<code>keyvalue</code>'],
+        ['Marker syntax', '<code>@release["Agent Inbox", beta, eta: "July 2026", owner: "Core UX"]</code>'],
+        ['Schema', '<code>[B.string("name"), B.enum("status", [...]), ...]</code>'],
         ['Best use', 'Roadmap chips, launch badges, release summaries, ownership metadata'],
       ]} />
-      <Code>{`const releaseBridge = defineBridge({
+      <Code>{`import { defineBridge, B } from '@architprasar/md4ai/core';
+ 
+const releaseBridge = defineBridge({
   marker: 'release',
-  pattern: 'keyvalue',
+  fields: [
+    B.string('name').describe('Feature name'),
+    B.enum('status', ['live', 'beta', 'planned', 'blocked']).default('planned'),
+    B.string('eta').optional(),
+    B.string('owner').optional(),
+  ],
   render: ({ name, status, eta, owner }) => (
     <ReleaseBadge name={name} status={status} eta={eta} owner={owner} />
   ),
 });`}</Code>
       <InteractiveDemo title="Live bridge demo" description="This docs page ships a demo-only @release[...] bridge so you can edit the marker syntax and preview the custom component immediately." initial={LIVE_DEMOS.bridge} theme={docsTheme} minHeight={220} />
-
+ 
       <H3 id="bridge-define">Define a bridge</H3>
-      <Code>{`import { defineBridge } from '@architprasar/md4ai/core';
-
+      <P>Use <IC>defineBridge</IC> to create a new component. Use <IC>fields</IC> to declare your schema with the <IC>B</IC> factory.</P>
+      <Code>{`import { defineBridge, B } from '@architprasar/md4ai/core';
+  
 const statusBridge = defineBridge({
   marker: 'status',
-  pattern: 'scalar',
-  render: (value) => (
+  fields: [
+    B.string('value').describe('Current state'),
+  ],
+  render: ({ value }) => (
     <span className={\`badge badge--\${value}\`}>{value}</span>
   ),
 });`}</Code>
+  
+      <H3 id="bridge-fields">Positional Mapping</H3>
+      <P>The order of fields in the array defines the positional arguments. AI can use shorthand or named keys.</P>
+      <Code>{`// Define: [B.string('label'), B.string('value')]
+// AI uses: @kpi["Revenue", "$167k"]
+// Or: @kpi[label: "Revenue", value: "$167k"]`}</Code>
+ 
+      <H3 id="bridge-patterns">Recursive Field Parsing</H3>
+      <P>dTypes recursively parse their contents. A <IC>B.list</IC> of <IC>B.number</IC> will correctly cast every item.</P>
+      <Code>{`@sparkline[|38, 41, 45, 49|]`}</Code>
 
-      <H3 id="bridge-patterns">Built-in patterns</H3>
-      <Table head={['Pattern', 'Markdown', 'Parsed as']} rows={[
-        ['<code>scalar</code>', '<code>@badge[success]</code>', '<code>"success"</code>'],
-        ['<code>array</code>', '<code>@tags[React, Vue, Angular]</code>', '<code>["React", "Vue", "Angular"]</code>'],
-        ['<code>keyvalue</code>', '<code>@kpi[value: $167k, label: Revenue]</code>', '<code>{ value: "$167k", label: "Revenue" }</code>'],
-        ['<code>range</code>', '<code>@range[100 → 500]</code>', '<code>{ min: "100", max: "500" }</code>'],
-      ]} />
-      <P>For custom parsing, pass a function instead of a pattern string.</P>
-      <Code>{`defineBridge({
-  marker: 'progress',
-  pattern: (raw) => {
-    const [done, total] = raw.split('/').map(Number);
-    return { done, total, pct: Math.round((done / total) * 100) };
-  },
-  render: ({ done, total, pct }) => <div>{done}/{total} - {pct}%</div>,
-});`}</Code>
-
+      <H3 id="bridge-patterns-2">Smart Delimiters</H3>
+      <P>Lists within <IC>|...|</IC> automatically detect the best delimiter. Use <IC>|</IC> as a separator if items contain commas.</P>
+      <Code>{`@servicemap[nodes: |node1,Label,0,0|node2,Other,10,10|]`}</Code>
+ 
       <H3 id="bridge-register">Register with parse and renderContent</H3>
       <P>Pass the same <IC>bridges</IC> array to both.</P>
       <Code>{`import { parse } from '@architprasar/md4ai/core';
 import { renderContent } from '@architprasar/md4ai/react';
-
+ 
 const bridges = [statusBridge, kpiBridge, timelineBridge];
 const nodes = parse(markdown, { bridges });
 const ui = renderContent(nodes, { bridges });`}</Code>
-
+ 
       <H3 id="bridge-prompt">AI system prompt hints</H3>
-      <P>Use <IC>getPrompt()</IC> when you want a full md4ai-aware prompt that includes built-in syntax guidance plus optional bridges. Use <IC>getBridgePrompt()</IC> when you only want bridge-specific hints.</P>
-      <Code>{`import { getPrompt, getBridgePrompt } from '@architprasar/md4ai/core';
-
-statusBridge.prompt
-// → 'Use @status[value] inline. Example: @status[success]'
-
-const systemPrompt = getPrompt({
-  bridges,
-  prefix: 'Write markdown and use md4ai syntax when it helps:',
-});
-
-const productReviewPrompt = getPrompt({
-  bridges,
-  includeBuiltins: ['callouts', 'kpi', 'tables', 'steps'],
-  includeBridges: ['release', 'status'],
-});
-
-const bridgeOnlyPrompt = getBridgePrompt(bridges, {
-  include: ['payment', 'status'],
-});`}</Code>
-
+      <P>md4ai uses a two-tier prompting system (**Protocol & Catalog**) to save tokens.</P>
+      <Code>{`import { getBridgeProtocolPrompt, getPrompt } from '@architprasar/md4ai/core';
+ 
+// Tier 1: The universal bridge syntax rules
+const protocol = getBridgeProtocolPrompt();
+ 
+// Tier 2: The manifest of markers and fields
+const catalog = getPrompt({ bridges, mode: 'minimal' });`}</Code>
+ 
       <H3 id="bridge-host">Host data and events</H3>
       <P>Bridges can pull live data from your app and emit events back.</P>
       <Code>{`renderContent(nodes, {
@@ -625,8 +618,10 @@ for await (const chunk of stream) {
       <H3>defineBridge(options)</H3>
       <Table head={['Option', 'Type', 'Description']} rows={[
         ['<code>marker</code>', '<code>string</code>', 'The @marker name — lowercase letters and hyphens'],
-        ['<code>pattern</code>', '<code>"scalar" | "array" | "keyvalue" | "range" | (raw) => T</code>', 'How to parse the [data] content'],
+        ['<code>fields</code>', '<code>BridgeField[]</code>', 'Fluent array of dTypes (e.g. [B.string("id")])'],
         ['<code>render</code>', '<code>(data: T, ctx: BridgeRenderCtx) => ReactElement | null</code>', 'Renders the component'],
+        ['<code>prompt</code>', '<code>string</code>', 'Overrides the auto-generated AI system prompt hint'],
+        ['<code>onParseError</code>', '<code>(raw, error) => T</code>', 'Safe fallback when a custom parser throws'],
       ]} />
 
       <H2 id="vs-mdx">Why not MDX?</H2>

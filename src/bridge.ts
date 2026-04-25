@@ -1,4 +1,8 @@
 import type { ReactElement } from 'react';
+import { BridgeField, type InferSchemaType } from './dtypes.js';
+import { splitHybrid, cleanToken } from './lexer.js';
+ 
+export type { InferSchemaType };
 
 export type BuiltinPattern = 'scalar' | 'array' | 'keyvalue' | 'range';
 export type BridgePattern<T = unknown> = BuiltinPattern | ((raw: string) => T);
@@ -11,7 +15,7 @@ export type BridgePattern<T = unknown> = BuiltinPattern | ((raw: string) => T);
  * to generate the LLM prompt.  Fields are always parsed as keyvalue pairs:
  *   @marker[field: "value", field: "value"]
  */
-export type BridgeFields = Record<string, string>;
+export type BridgeFields = BridgeField<any>[];
 
 export interface BridgeRenderCtx {
   query: (key: string, params?: unknown) => unknown;
@@ -138,24 +142,65 @@ export function getBridgePrompt(
   if (!prompt) return options.prefix ?? '';
   return options.prefix ? `${options.prefix}${separator}${prompt}` : prompt;
 }
+/**
+ * Generates the "Tier 1" Bridge Protocol prompt.
+ * This teaches the model the universal syntax for all bridges.
+ */
+export function getBridgeProtocolPrompt(): string {
+  return [
+    '### Universal Bridge Syntax (@marker)',
+    'Use @marker[data] to insert rich components. Brackets `[...]` are ALWAYS mandatory.',
+    '1. **Fields**: You can use positional arguments, named keys, or a mix of both.',
+    '   - Positional: @marker["Value 1", "Value 2"]',
+    '   - Named: @marker[key1: "Value 1", key2: "Value 2"]',
+    '   - Hybrid: @marker["Value 1", key2: "Value 2"]',
+    '2. **Lists**: Wrap multi-item lists in pipes to avoid comma clashing: @marker[|a, b, c|].',
+    '3. **Smart Delimiters**: Inside |...|, use `|` as a separator if items contain commas (e.g., @marker[|id,label|id2,label|]).',
+    '4. **Spacing**: Ensure a space precedes the `@` symbol if it is mid-sentence.',
+    '5. **No-Code**: NEVER emit bridges inside markdown code blocks or backticks.',
+  ].join('\n');
+}
 
+/**
+ * Generates a "Compressed Catalog" line for a bridge.
+ */
 function promptFromFields(marker: string, fields: BridgeFields): string {
-  const fieldList = Object.entries(fields)
-    .map(([key, desc]) => `  ${key}: ${desc}`)
+  const catalog = fields.map((f) => {
+    let part = f.metadata.name;
+    if (f.metadata.optional) part += '?';
+    if (f.metadata.type === 'enum' && f.metadata.options) {
+      part += `: ${f.metadata.options.join('|')}`;
+    } else if (f.metadata.type === 'list') {
+      part = `|${part}|`;
+    }
+    return part;
+  }).join(', ');
+ 
+  const fieldDetails = fields
+    .map((f) => {
+      const parts = [];
+      if (f.metadata.description) parts.push(f.metadata.description);
+      if (f.metadata.type === 'number') parts.push('(num)');
+      if (f.metadata.type === 'boolean') parts.push('(bool)');
+      if (f.metadata.prompt) parts.push(f.metadata.prompt);
+      if (parts.length === 0) return null;
+      return `  - ${f.metadata.name}: ${parts.join(' ')}`;
+    })
+    .filter(Boolean)
     .join('\n');
-  const example = Object.keys(fields)
-    .map((k) => `${k}: "..."`)
-    .join(', ');
-  return `Use @${marker}[${example}] to render a ${marker} component.\nFields:\n${fieldList}`;
+ 
+  let res = `- ${marker}: [${catalog}]`;
+  if (fieldDetails) res += `\n${fieldDetails}`;
+  return res;
 }
 
 function autoPrompt(marker: string, pattern: BuiltinPattern | Function): string {
   switch (pattern) {
-    case 'scalar':   return `Use @${marker}[value] inline. Example: @${marker}[success]`;
-    case 'array':    return `Use @${marker}[a, b, c] inline. Example: @${marker}[React, Vue, Angular]`;
+    case 'scalar': return `Use @${marker}[value] inline. Example: @${marker}[success]`;
+    case 'array': return `Use @${marker}[a, b, c] inline. Example: @${marker}[React, Vue, Angular]`;
     case 'keyvalue': return `Use @${marker}[key: value, key: value] inline. Example: @${marker}[name: Alice, role: Admin]`;
-    case 'range':    return `Use @${marker}[low → high] inline. Example: @${marker}[100 → 500]`;
-    default:         return `Use @${marker}[data] to render a ${marker} component.`;
+    case 'range': return `Use @${marker}[low → high] inline. Example: @${marker}[100 → 500]`;
+    default: return `Use @${marker}[data] to render a ${marker} component.`;
   }
 }
 
@@ -163,12 +208,13 @@ function isValidMarker(marker: string): boolean {
   return /^[a-z][a-z0-9-]*$/.test(marker);
 }
 
-/** Bridge defined with explicit fields — parsing is always keyvalue, prompt is auto-generated. */
-export function defineBridge<T extends Record<string, string>>(def: {
+/** Bridge defined with an explicit dType array schema. */
+export function defineBridge<F extends BridgeField<any>[]>(def: {
   marker: string;
-  fields: BridgeFields;
-  render: (data: T, ctx: BridgeRenderCtx) => ReactElement | null;
-}): BridgeDefinition<T>;
+  fields: F;
+  render: (data: InferSchemaType<F>, ctx: BridgeRenderCtx) => ReactElement | null;
+  onParseError?: (raw: string, error: unknown) => InferSchemaType<F>;
+}): BridgeDefinition<InferSchemaType<F>>;
 
 /** Bridge defined with an explicit pattern — full control over parsing. */
 export function defineBridge<T = string>(def: {
@@ -203,12 +249,84 @@ export function defineBridge<T>(def: {
     render: def.render,
     prompt,
     _parse: (raw: string) => {
-      try {
-        return parseBridgeData(pattern, raw);
-      } catch (error) {
-        if (def.onParseError) return def.onParseError(raw, error);
-        return raw as T;
-      }
+      const tokens = splitHybrid(raw);
+      const data: any = {};
+      const fields = def.fields || [];
+      let positionalIdx = 0;
+ 
+      // Internal recursive parser for fields
+      const parseValue = (field: BridgeField<any>, rawVal: any): any => {
+        const meta = field.metadata;
+        const val = cleanToken(String(rawVal || ''));
+ 
+        if (val === undefined || val === '') {
+          return meta.defaultValue;
+        }
+ 
+        if (meta.type === 'number') {
+          const num = Number(val);
+          return Number.isNaN(num) ? val : num;
+        }
+        if (meta.type === 'boolean') {
+          return val.toLowerCase() === 'true';
+        }
+        if (meta.type === 'enum') {
+          return val;
+        }
+        if (meta.type === 'list') {
+          const originalRaw = String(rawVal || '').trim();
+          const isPiped = originalRaw.startsWith('|') && originalRaw.endsWith('|');
+          const delimiter = (isPiped && val.includes('|')) ? '|' : ',';
+          const items = val.split(delimiter).map((s) => s.trim()).filter(Boolean);
+          if (meta.itemType) {
+            return items.map((item) => parseValue(meta.itemType!, item));
+          }
+          return items;
+        }
+        if (meta.type === 'keyvalue') {
+          const originalRaw = String(rawVal || '').trim();
+          const isPiped = originalRaw.startsWith('|') && originalRaw.endsWith('|');
+          const delimiter = (isPiped && val.includes('|')) ? '|' : ',';
+          const kv: Record<string, string> = {};
+          val.split(delimiter).forEach((p) => {
+            const c = p.indexOf(':');
+            if (c !== -1) {
+              const k = cleanToken(p.slice(0, c));
+              const v = cleanToken(p.slice(c + 1));
+              kv[k] = v;
+            }
+          });
+          return kv;
+        }
+        return val;
+      };
+ 
+      tokens.forEach((token) => {
+        const colon = token.indexOf(':');
+        // Named field: key: val (ensure it's not inside |...| or "...")
+        if (colon !== -1 && !token.startsWith('|') && !token.startsWith('"')) {
+          const key = cleanToken(token.slice(0, colon));
+          const val = token.slice(colon + 1);
+          data[key] = val;
+        } else {
+          // Positional field
+          while (positionalIdx < fields.length) {
+            const field = fields[positionalIdx++];
+            if (data[field.metadata.name] === undefined) {
+              data[field.metadata.name] = token;
+              break;
+            }
+          }
+        }
+      });
+ 
+      // Post-process casting and defaults
+      const final: any = {};
+      fields.forEach((field) => {
+        final[field.metadata.name] = parseValue(field, data[field.metadata.name]);
+      });
+ 
+      return final as T;
     },
   };
 }
