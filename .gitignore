@@ -3,3 +3,6 @@ dist
 node_modules
 .claude
 AGENTS.md
+.env
+test-results/
+eval/

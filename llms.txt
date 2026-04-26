@@ -1,0 +1,20 @@
+# md4ai: AI-Friendly Rich Markdown
+
+md4ai is a library that extends standard markdown with rich UI components (KPIs, Charts, Steps, etc.) designed for LLM output density and interactive React rendering.
+
+## Core Documentation
+- [Quickstart](https://architprasar.github.io/md4ai/docs.html#quickstart): Installation and basic setup for React.
+- [Prompting Guide](https://architprasar.github.io/md4ai/docs.html#prompting): How to teach models to use the syntax.
+- [Bridges](https://architprasar.github.io/md4ai/docs.html#bridges): Creating custom @directives for your own components.
+- [Streaming](https://architprasar.github.io/md4ai/docs.html#streaming): Handling partial markdown blocks without flickering.
+
+## Syntax Reference
+- [Callouts](https://architprasar.github.io/md4ai/docs.html#callouts): GitHub-style alerts (> [!NOTE]).
+- [Charts](https://architprasar.github.io/md4ai/docs.html#charts): Bar, line, and pie charts via JSON fences.
+- [KPI Metrics](https://architprasar.github.io/md4ai/docs.html#kpi-metrics): High-density @kpi cards for stats.
+- [Steps](https://architprasar.github.io/md4ai/docs.html#steps): Workflow and timeline components.
+- [Layout](https://architprasar.github.io/md4ai/docs.html#layout): Multi-column markdown rendering.
+- [Buttons & Inputs](https://architprasar.github.io/md4ai/docs.html#buttons): Interactive elements in markdown.
+
+## Full Documentation
+- [Full Reference](https://architprasar.github.io/md4ai/llms-full.txt): A single file containing all documentation for full context injection.

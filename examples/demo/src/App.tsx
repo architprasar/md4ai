@@ -26,8 +26,9 @@ function useDebounced<T>(value: T, delay: number): T {
 }
 
 export default function App() {
-  const [selectedSample, setSelectedSample] = useState(SAMPLE_CONTENTS[0].id);
-  const [source, setSource] = useState(SAMPLE_CONTENTS[0].content);
+  const [page, setPage] = useState<any>('playground');
+  const [selectedSample, setSelectedSample] = useState<string>(SAMPLE_CONTENTS[0].id);
+  const [source, setSource] = useState<string>(SAMPLE_CONTENTS[0].content);
   const [isDark, setIsDark] = useStoredColorMode();
   const [themeName, setThemeName] = useState<ThemeName>('zinc');
   const [dragging, setDragging] = useState(false);
@@ -70,7 +71,7 @@ export default function App() {
 
   useEffect(() => () => { if (streamRef.current) clearInterval(streamRef.current); }, []);
 
-  const loadSample = useCallback((sampleId: typeof SAMPLE_CONTENTS[number]['id']) => {
+  const loadSample = useCallback((sampleId: string) => {
     const sample = SAMPLE_CONTENTS.find((item) => item.id === sampleId);
     if (!sample) return;
     stopStream();
@@ -101,125 +102,137 @@ export default function App() {
   }, [dragging]);
 
   return (
-    <div className="app" style={cssVars} onMouseMove={onMouseMove} onMouseUp={onMouseUp}>
+    <div className="app" style={cssVars as any} onMouseMove={onMouseMove} onMouseUp={onMouseUp}>
       <SiteHeader
-        currentPage="playground"
+        currentPage={page}
         rightSlot={
-          <>
-          <div className="theme-picker" role="group" aria-label="Choose theme">
-            {(Object.keys(themes) as ThemeName[]).map(name => (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', marginRight: '1rem' }}>
               <button
-                key={name}
                 type="button"
-                className={`theme-dot${themeName === name ? ' theme-dot--active' : ''}`}
-                style={{ background: THEME_DOTS[name][isDark ? 'dark' : 'light'] }}
-                onClick={() => setThemeName(name)}
-                title={themes[name].label}
-                aria-label={`${themes[name].label} theme`}
-                aria-pressed={themeName === name}
-              />
-            ))}
+                className="btn-icon btn-icon--active"
+              >
+                Playground
+              </button>
+            </div>
+
+            <div className="theme-picker" role="group" aria-label="Choose theme">
+              {(Object.keys(themes) as ThemeName[]).map(name => (
+                <button
+                  key={name}
+                  type="button"
+                  className={`theme-dot${themeName === name ? ' theme-dot--active' : ''}`}
+                  style={{ background: THEME_DOTS[name][isDark ? 'dark' : 'light'] }}
+                  onClick={() => setThemeName(name)}
+                  title={themes[name].label}
+                  aria-label={`${themes[name].label} theme`}
+                  aria-pressed={themeName === name}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              className={`btn-icon${isStreaming ? ' btn-icon--active' : ''}`}
+              onClick={isStreaming ? stopStream : startStream}
+              title={isStreaming ? 'Stop stream simulation' : 'Simulate streaming render'}
+            >
+              {isStreaming ? '⏹ Stop' : '▶ Stream'}
+            </button>
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={() => setIsDark(d => !d)}
+              title="Toggle dark mode"
+              aria-label="Toggle dark mode"
+            >
+              {isDark ? 'Light' : 'Dark'}
+            </button>
           </div>
-          <button
-            type="button"
-            className={`btn-icon${isStreaming ? ' btn-icon--active' : ''}`}
-            onClick={isStreaming ? stopStream : startStream}
-            title={isStreaming ? 'Stop stream simulation' : 'Simulate streaming render'}
-          >
-            {isStreaming ? '⏹ Stop' : '▶ Stream'}
-          </button>
-          <button
-            type="button"
-            className="btn-icon"
-            onClick={() => setIsDark(d => !d)}
-            title="Toggle dark mode"
-            aria-label="Toggle dark mode"
-          >
-            {isDark ? 'Light' : 'Dark'}
-          </button>
-          </>
         }
       />
 
-      <section className="playground-intro">
-        <div className="playground-intro__copy">
-          <span className="playground-intro__eyebrow">Playground</span>
-          <h1>Test real markdown workflows before you wire md4ai into your app.</h1>
-          <p>
-            Switch between realistic samples, stream partial responses, and compare source markdown
-            with the rendered output side by side.
-          </p>
-          <div className="playground-intro__code">import {'{ parse }'} from '@architprasar/md4ai/core' + import {'{ renderContent }'} from '@architprasar/md4ai/react'</div>
-          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', marginTop: '0.95rem' }}>
-            <a href="./token-efficiency.html" className="btn-icon" style={{ textDecoration: 'none' }}>See token efficiency</a>
-          </div>
-        </div>
-        <div className="playground-intro__meta">
-          <div className="playground-stat">
-            <strong>{SAMPLE_CONTENTS.length}</strong>
-            <span>copy-ready scenarios</span>
-          </div>
-          <div className="playground-stat">
-            <strong>Streaming-safe</strong>
-            <span>handles partial blocks without blowing up</span>
-          </div>
-          <div className="playground-stat">
-            <strong>Extensible</strong>
-            <span>bridges, themes, and renderer overrides</span>
-          </div>
-          <div className="playground-stat">
-            <strong>Often smaller than UI JSON</strong>
-            <span>compact directives can reduce schema overhead and retry cost</span>
-          </div>
-        </div>
-      </section>
+      <main className="main-content">
+        <div className="playground-view">
+            <section className="playground-intro">
+              <div className="playground-intro__copy">
+                <span className="playground-intro__eyebrow">Playground</span>
+                <h1>Test real markdown workflows before you wire md4ai into your app.</h1>
+                <p>
+                  Switch between realistic samples, stream partial responses, and compare source markdown
+                  with the rendered output side by side.
+                </p>
+                <div className="playground-intro__code">
+                  <code>{"import { parse } from '@architprasar/md4ai/core'"}</code>
+                </div>
+              </div>
+              <div className="playground-intro__meta">
+                <div className="playground-stat">
+                  <strong>{SAMPLE_CONTENTS.length}</strong>
+                  <span>copy-ready scenarios</span>
+                </div>
+                <div className="playground-stat">
+                  <strong>Streaming-safe</strong>
+                  <span>handles partial blocks without blowing up</span>
+                </div>
+                <div className="playground-stat">
+                  <strong>Extensible</strong>
+                  <span>bridges, themes, and renderer overrides</span>
+                </div>
+                <div className="playground-stat">
+                  <strong>Often smaller than UI JSON</strong>
+                  <span>compact directives can reduce schema overhead and retry cost</span>
+                </div>
+              </div>
+            </section>
 
-      <section className="sample-rail" aria-label="Sample scenarios">
-        {SAMPLE_CONTENTS.map((sample) => (
-          <button
-            key={sample.id}
-            type="button"
-            className={`sample-chip${sample.id === selectedSample ? ' sample-chip--active' : ''}`}
-            onClick={() => loadSample(sample.id)}
-          >
-            <span className="sample-chip__label">{sample.label}</span>
-            <span className="sample-chip__description">{sample.description}</span>
-          </button>
-        ))}
-      </section>
+            <section className="sample-rail" aria-label="Sample scenarios">
+              {SAMPLE_CONTENTS.map((sample) => (
+                <button
+                  key={sample.id}
+                  type="button"
+                  className={`sample-chip${sample.id === selectedSample ? ' sample-chip--active' : ''}`}
+                  onClick={() => loadSample(sample.id)}
+                >
+                  <span className="sample-chip__label">{sample.label}</span>
+                  <span className="sample-chip__description">{sample.description}</span>
+                </button>
+              ))}
+            </section>
 
-      <div className="app-body" ref={containerRef}>
-        <div className="pane pane--editor" style={{ width: `${splitPct}%` }}>
-          <div className="pane__header">
-            <span>Markdown</span>
-            <span className="pane__badge">{activeSample.label.toLowerCase()}</span>
-          </div>
-          <textarea
-            className="editor"
-            value={source}
-            onChange={e => setSource(e.target.value)}
-            spellCheck={false}
-            aria-label="Markdown source editor"
-          />
-        </div>
+            <div className="app-body" ref={containerRef}>
+              <div className="pane pane--editor" style={{ width: `${splitPct}%` }}>
+                <div className="pane__header">
+                  <span>Markdown</span>
+                  <span className="pane__badge">{activeSample.label.toLowerCase()}</span>
+                </div>
+                <textarea
+                  className="editor"
+                  value={source}
+                  onChange={e => setSource(e.target.value)}
+                  spellCheck={false}
+                  aria-label="Markdown source editor"
+                />
+              </div>
 
-        <div
-          className={`divider${dragging ? ' divider--active' : ''}`}
-          onMouseDown={onMouseDown}
-          role="separator"
-          aria-label="Resize panels"
-        />
+              <div
+                className={`divider${dragging ? ' divider--active' : ''}`}
+                onMouseDown={onMouseDown}
+                role="separator"
+                aria-label="Resize panels"
+              />
 
-        <div className="pane pane--preview" style={{ width: `${100 - splitPct}%` }}>
-          <div className="pane__header">
-            <span>Preview</span>
-            <span className="pane__badge">{isStreaming ? 'streaming' : themes[themeName].label.toLowerCase()}</span>
+              <div className="pane pane--preview" style={{ width: `${100 - splitPct}%` }}>
+                <div className="pane__header">
+                  <span>Preview</span>
+                  <span className="pane__badge">{isStreaming ? 'streaming' : themes[themeName].label.toLowerCase()}</span>
+                </div>
+                <div className="preview">
+                  {rendered}
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="preview">
-            {rendered}
-          </div>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

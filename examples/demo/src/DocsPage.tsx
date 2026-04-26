@@ -70,16 +70,16 @@ export default function DocsPage() {
         }
       />
 
-      <div style={{ display: 'flex', paddingTop: 52 }}>
-        <div className="docs-mobile-nav">
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)' }}>
-            {DOCS_NAV.find(s => s.id === active || s.children?.some(c => c.id === active))?.label ?? 'Documentation'}
-          </span>
-          <button className="menu-toggle" onClick={() => setShowNav(!showNav)}>
-            {showNav ? '✕' : '☰'}
-          </button>
-        </div>
+      <div className="docs-mobile-nav">
+        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)' }}>
+          {DOCS_NAV.find(s => s.id === active || s.children?.some(c => c.id === active))?.label ?? 'Documentation'}
+        </span>
+        <button className="menu-toggle" onClick={() => setShowNav(!showNav)}>
+          {showNav ? '✕' : '☰'}
+        </button>
+      </div>
 
+      <div style={{ display: 'flex', paddingTop: 52 }}>
         <aside className={`docs-sidebar${showNav ? ' docs-sidebar--open' : ''}`}>
           {DOCS_NAV.map((section) => {
             const sectionActive = active === section.id || Boolean(section.children?.some((child) => child.id === active));

@@ -3,6 +3,27 @@ import { Callout, Code, H2, H3, IC, InteractiveDemo, P, PromptBuilderDemo, Promp
 import { getPrompt } from '@architprasar/md4ai/core';
 import { BRIDGES } from '../bridges.js';
 
+function CopyMCPButton() {
+  const [copied, setCopied] = React.useState(false);
+  const command = 'npx -y github:architprasar/md4ai';
+
+  const onCopy = () => {
+    navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button 
+      onClick={onCopy} 
+      className="btn-icon" 
+      style={{ background: copied ? 'var(--accent)' : 'transparent', color: copied ? 'white' : 'inherit' }}
+    >
+      {copied ? '✓ Copied Command' : '🔌 Copy MCP'}
+    </button>
+  );
+}
+
 export const DOCS_NAV: { label: string; id: string; children?: { label: string; id: string }[] }[] = [
   { label: 'Getting Started', id: 'getting-started' },
   { label: 'Quickstart', id: 'quickstart' },
@@ -46,7 +67,6 @@ export const DOCS_NAV: { label: string; id: string; children?: { label: string; 
   { label: 'Overrides', id: 'overrides' },
   { label: 'Streaming', id: 'streaming' },
   { label: 'API Reference', id: 'api' },
-  { label: 'Why not MDX?', id: 'vs-mdx' },
 ];
 
 const LIVE_DEMOS = {
@@ -156,6 +176,7 @@ export function DocsHeroSection() {
             <a href="./showcase.html" className="btn-icon btn-icon--active" style={{ textDecoration: 'none' }}>Open live demo</a>
             <a href="./index.html" className="btn-icon" style={{ textDecoration: 'none' }}>Open playground</a>
             <a href="https://github.com/architprasar/md4ai" className="btn-icon" style={{ textDecoration: 'none' }}>GitHub</a>
+            <CopyMCPButton />
           </div>
           <Code>{`import { parse, parseStreaming, defineBridge, B } from '@architprasar/md4ai/core';
 import { renderContent, themes } from '@architprasar/md4ai/react';`}</Code>
@@ -201,6 +222,17 @@ export function GettingStartedSection({ docsTheme }: { docsTheme: DocsTheme }) {
 npm install react react-dom
 # optional — only needed for chart fences
 npm install chart.js`}</Code>
+
+      <H3 id="mcp">Agent Support (MCP)</H3>
+      <P>You can let your AI agent (Claude, etc.) automatically understand md4ai documentation and syntax by adding our Model Context Protocol (MCP) server. Click the <strong>Copy MCP</strong> button in the hero section to get the command, or add it manually to your configuration:</P>
+      <Code>{`{
+  "mcpServers": {
+    "md4ai": {
+      "command": "node",
+      "args": ["/path/to/md4ai/mcp-server.mjs"]
+    }
+  }
+}`}</Code>
 
       <H2 id="quickstart">Quickstart</H2>
       <Code>{`import { parse, defineBridge, B } from '@architprasar/md4ai/core';
@@ -623,19 +655,6 @@ for await (const chunk of stream) {
         ['<code>prompt</code>', '<code>string</code>', 'Overrides the auto-generated AI system prompt hint'],
         ['<code>onParseError</code>', '<code>(raw, error) => T</code>', 'Safe fallback when a custom parser throws'],
       ]} />
-
-      <H2 id="vs-mdx">Why not MDX?</H2>
-      <P>MDX is the right tool when humans author content at build time. md4ai is the right tool when AI generates content at runtime.</P>
-      <Table head={['', 'MDX', '@architprasar/md4ai']} rows={[
-        ['Requires build step', '✗ Yes', '✓ Pure runtime'],
-        ['AI must write JSX', '✗ Yes — breaks constantly', '✓ Plain markdown'],
-        ['Streaming support', '✗ No', '✓ Yes'],
-        ['Custom components', 'Import in file', 'defineBridge + one prompt line'],
-        ['Readable without renderer', '✗ No', '✓ Degrades to plain text'],
-      ]} />
-      <Callout type="warning">
-        MDX requires the AI to write valid JSX — import statements, component names, prop syntax — and any mistake causes a parse error.
-      </Callout>
     </>
   );
 }

@@ -1,0 +1,1463 @@
+# md4ai Full Documentation
+
+## Overview
+
+# md4ai
+
+**Rich markdown for AI.** Drop md4ai into your AI chat UI and responses automatically render as charts, callouts, cards, KPI metrics, timelines, and more — no prompt engineering, no JSON, just markdown.
+
+```
+npm install @architprasar/md4ai
+```
+
+> **Peer deps:** `react >=18`, `react-dom >=18`  
+> **Optional:** `chart.js >=4` — only needed if you use chart fences
+
+---
+
+## The problem
+
+AI models output markdown natively. But standard markdown renderers give you headings and bullet points. Your users get a wall of text when the AI could be showing them a bar chart, a KPI card, a status timeline.
+
+The usual fix is prompt engineering — coerce the AI into outputting JSON, parse it, render it. It breaks constantly. The AI forgets the schema, nests things wrong, adds a sentence before the JSON block.
+
+md4ai takes a different approach: **extend markdown itself.** The AI writes markdown. md4ai renders it as rich UI. No JSON. No custom formats. No prompt gymnastics.
+
+Another practical advantage: this often saves tokens compared to custom JSON UI schemas. Markdown plus compact directives like `::kpi{...}` or `@release[...]` is usually smaller than nested `type/props/content` JSON, and it also reduces repair-cost tokens from malformed structured output.
+
+## Bridge System (AI-Native Components)
+
+Instead of complex JSON schemas, `md4ai` uses a **dType Schema API** to define component interfaces. 
+
+- **Automatic Casting**: Converts raw strings to `number`, `boolean`, `Array`, or `Record`.
+- **Hybrid Syntax**: AI can use positional arguments, named keys, or a mix of both.
+- **Recursive Parsing**: Lists and Key-Values recursively parse their children.
+- **Smart Delimiters**: Lists automatically detect the best separator (`|` or `,`).
+
+### Example: Defining a Bridge
+
+```tsx
+import { defineBridge, B } from '@architprasar/md4ai/core';
+
+const kpiBridge = defineBridge({
+  marker: 'kpi',
+  fields: [
+    B.string('label').describe('The metric name'),
+    B.string('value').describe('Current value'),
+    B.number('change').optional(),
+  ],
+  render: ({ label, value, change }) => (
+    <div className="kpi-card">
+      <h4>{label}</h4>
+      <strong>{value}</strong>
+      {change && <span>{change > 0 ? '+' : ''}{change}%</span>}
+    </div>
+  )
+});
+```
+
+### AI Output Examples
+
+The model can emit any of these; the parser handles them all:
+
+- **Positional**: `@kpi["Revenue", "$1.2M", 14]`
+- **Named**: `@kpi[label: "Revenue", value: "$1.2M", change: 14]`
+- **Hybrid**: `@kpi["Revenue", "$1.2M", change: 14]`
+- **Complex Lists**: `@sparkline[|10, 20, 15, 30, 25|]`
+
+## Two-Tier Prompting
+
+Keep your system prompts small by separating the universal protocol from the component manifest.
+
+```ts
+import { getBridgeProtocolPrompt, getPrompt } from '@architprasar/md4ai/core';
+
+// 1. The universal bridge syntax rules
+const protocol = getBridgeProtocolPrompt();
+
+// 2. The manifest of markers and fields (Catalog)
+const catalog = getPrompt({ bridges, mode: 'minimal' });
+```
+
+---
+
+## Quickstart
+
+```tsx
+import { parse } from '@architprasar/md4ai/core';
+import { renderContent } from '@architprasar/md4ai/react';
+
+function AIMessage({ content }: { content: string }) {
+  return renderContent(parse(content));
+}
+```
+
+For streaming responses — call on the full accumulated text every chunk:
+
+```tsx
+import { parseStreaming } from '@architprasar/md4ai/core';
+import { renderContent } from '@architprasar/md4ai/react';
+
+function StreamingMessage({ text }: { text: string }) {
+  // Safe mid-stream — unclosed fences render as placeholders, never throw
+  return renderContent(parseStreaming(text));
+}
+```
+
+If you want a clearer package boundary, use subpath imports:
+
+```tsx
+import { parse, parseStreaming, defineBridge } from '@architprasar/md4ai/core';
+import { renderContent, themes } from '@architprasar/md4ai/react';
+```
+
+`md4ai` still re-exports the full API for backwards compatibility, but `@architprasar/md4ai/core` and `@architprasar/md4ai/react` make the parser/renderer split explicit.
+
+---
+
+## Repository layout
+
+- `src/` — parser, IR, themes, bridges, and React renderer
+- `examples/demo/` — playground, docs page, and GitHub Pages demo
+- `test/` — parser and streaming regression tests
+- `docs/` — contributor-facing architecture notes
+
+---
+
+## Development
+
+```bash
+npm ci
+npm --prefix examples/demo ci
+npm run typecheck
+npm test
+npm run dev
+```
+
+- `npm run typecheck` validates the library source with TypeScript
+- `npm test` rebuilds the package and runs the Node-based regression suite
+- `npm run dev` starts the example app for manual QA
+- `npm run build:demo` builds the Pages-ready demo bundle
+
+Contributor workflow and review expectations live in [`CONTRIBUTING.md`](./CONTRIBUTING.md). A short system view of the parser and renderer pipeline lives in [`docs/architecture.md`](./docs/architecture.md). Production integration guidance for streaming, theming, bridges, and component overrides lives in [`docs/production.md`](./docs/production.md).
+
+---
+
+## Extended syntax
+
+All standard markdown works exactly as expected. md4ai adds these on top — every extension is valid plain text if md4ai isn't present.
+
+### Callouts
+
+GitHub-style alerts — the AI already knows this syntax from its training data.
+
+```markdown
+> [!NOTE]
+> East region leads with $167k, up 18% QoQ.
+
+> [!TIP]
+> APAC shows the strongest growth trajectory. Invest now.
+
+> [!WARNING]
+> South region is down 7%. Churn is accelerating.
+
+> [!DANGER]
+> Pipeline coverage for Q2 is critically thin.
+```
+
+Variants: `NOTE` `INFO` `TIP` `WARNING` `DANGER`
+
+---
+
+### Charts
+
+Fenced code block with `chart` lang. Uses Chart.js under the hood — install it separately.
+
+````markdown
+```chart
+{
+  "type": "bar",
+  "labels": ["North", "South", "East", "West", "APAC"],
+  "datasets": [
+    { "label": "Q1 Revenue ($k)", "data": [142, 98, 167, 121, 89] },
+    { "label": "Q4 Revenue ($k)", "data": [128, 105, 141, 110, 74] }
+  ]
+}
+```
+````
+
+Supported types: `bar` `line` `pie` `doughnut` `radar`
+
+During streaming, an animated skeleton placeholder renders until the JSON is complete — no raw JSON flash.
+
+---
+
+### Steps and timelines
+
+Use a fenced workflow block for AI-generated plans, checklists, and project updates. Both `steps` and `timeline` render the same first-class component.
+
+````markdown
+```steps
+- [done] Gather requirements
+  Confirm success criteria and edge cases
+- [active] Build parser support
+  Accept partial syntax during streaming
+- [planned] Add docs and demo examples
+```
+````
+
+Accepted formats are intentionally forgiving: `[done] Title`, `Title [done]`, `done: Title`, `Title: planned`, and `Title | active | extra detail` all work. Lines without a recognized status fall back to `planned`.
+
+---
+
+### KPI metrics
+
+Use a leaf directive for a single headline metric. It stays readable in plain text and is easy for LLMs to emit consistently.
+
+```markdown
+::kpi{label="Revenue" value="$167k" change="+18%" period="QoQ"}
+::kpi{label="Net Retention" value="108%" change="+4 pts" period="YoY"}
+::kpi{label="South Region" value="$98k" change="-7%" period="QoQ"}
+```
+
+`label` and `value` are the core fields. `change` and `period` are optional.
+
+---
+
+### Cards
+
+```markdown
+:::card{title="Immediate action"}
+Schedule a call with South region AEs. Pull exit survey data first.
+:::
+```
+
+---
+
+### Multi-column layout
+
+````markdown
+```layout columns=2
+### What's Working
+- Enterprise motion in East is repeatable
+- APAC partner channel gaining traction
+
+---
+
+### What Needs Attention
+- South SMB retention — churn is accelerating
+- West pipeline coverage is thin
+```
+````
+
+---
+
+### Buttons
+
+```markdown
+::button[Export Report]{href="#" variant="primary"}
+::button[Build Forecast]{href="#" variant="secondary"}
+```
+
+Variants: `primary` `secondary` `default`
+
+> **Note:** remark-directive attribute syntax uses spaces between attributes, not commas.
+
+---
+
+### Inputs
+
+```markdown
+::input{type="text" placeholder="Ask a follow-up..." label="Follow-up"}
+```
+
+---
+
+### Video embeds
+
+````markdown
+```video
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+```
+````
+
+YouTube and Vimeo URLs become responsive iframes. Any other URL renders as a native `<video>` element.
+
+---
+
+### Task lists
+
+Standard GFM syntax — rendered with visual checkboxes.
+
+```markdown
+- [x] Pull Q1 revenue data from CRM
+- [x] Identify top churned accounts
+- [ ] Schedule South region review call
+- [ ] Draft Q2 forecast model
+```
+
+---
+
+### Inline bridges
+
+md4ai ships 16 ready-made bridge markers for AI product surfaces. Use any of them by adding the corresponding bridge definition to your `BRIDGES` array. See [`docs/bridges.md`](./docs/bridges.md) for the full field reference.
+
+**General purpose**
+
+```markdown
+@kpi["Revenue", "$167k", change: +18%, period: QoQ]
+ 
+@sparkline[|38, 41, 45, 49, 58, 62, 71|]
+ 
+@timeline[|Discovery: done, Design: done, Build: active, Launch: planned|]
+ 
+@release["zod v3.22", status: beta, eta: "Pinned at rc.2", owner: Platform]
+ 
+@gauge["Checkout Processor", 61, max: 100, unit: %, warn: 75, crit: 65]
+ 
+@signal["SQL injection", tone: critical, score: 9.4, trend: new, note: "Parameterized query required."]
+ 
+@fileheat["47 files", |src/checkout/processor.ts:98:modified, src/auth/session.ts:71:added|]
+ 
+@payment["$79", "CodeSentinel Pro", desc: "Automatic merge blocking and auto-fix PRs."]
+```
+
+**AI agent surfaces**
+
+```markdown
+@agent[name: CodeSentinel, role: Security Reviewer, status: done, latency: 4.2s, tools: AST Analysis|Semgrep, goal: Block insecure merges]
+
+@command[title: Ops Console, stage: Live, owner: AI Ops, channels: PagerDuty|Slack, note: All clear.]
+```
+
+**Trading / market data**
+
+```markdown
+@ticker[symbol: NVDA, price: $984.22, move: +3.8%, volume: 42.1M, range: 952-991]
+
+@position[symbol: NVDA, side: long, entry: $902, target: $1025, stop: $864, size: 7.5%]
+
+@trade[action: Buy on pullback, window: next 2 sessions, confidence: 78, status: active]
+
+@candles[symbol: NVDA; thesis: Support holding at $952; candles: 2026-04-21:910:956:905:948:36|2026-04-22:948:972:941:966:41]
+```
+
+**Architecture / infra**
+
+```markdown
+@servicemap[title: Checkout graph; nodes: api,API Layer,0,80,active|validator,Validator,220,0,done; edges: api>validator>validate]
+
+@pipelineflow[title: Q2 Pipeline; stages: Sourced,$2.8M,182,done|Qualified,$1.7M,96,active|Proposal,$740k,41,planned]
+```
+
+Bridge markers that use semicolons as field delimiters (`candles`, `servicemap`, `pipelineflow`) do so because their values contain commas internally. See [`docs/bridges.md`](./docs/bridges.md) for all fields and formats.
+
+---
+
+### Tables
+
+Standard GFM tables work out of the box. The built-in HTML renderer adds analytics-friendly defaults without changing markdown syntax: mostly numeric columns are right-aligned, dense tables tighten spacing automatically, summary rows like `Total` and `Average` are emphasized, and simple status/delta values get clearer visual treatment.
+
+```markdown
+| Region | Revenue | Change | Status |
+| --- | --- | --- | --- |
+| East | $167k | +18% | On track |
+| South | $98k | -7% | At risk |
+| APAC | $89k | +20% | Healthy |
+| Total | $354k | +11% | Stable |
+```
+
+This keeps AI-generated report tables readable on mobile and desktop, even when the model only emits plain markdown.
+
+---
+
+## Bridge system
+
+Bridges let anyone map a custom `@marker[data]` inline syntax to any React component. The AI learns it from a single example in the system prompt. Publish bridges as `md4ai-bridge-*` npm packages to share with the ecosystem.
+
+### Syntax
+
+```
+The build is @status[passing] with @num[142] tests.
+
+Top markets this quarter: @tags[East, North, APAC]
+
+@kpi[value: $167k, label: East Revenue, change: +18%, period: QoQ]
+
+Project status: @timeline[Discovery: done, Design: done, Build: active, Launch: planned]
+```
+
+`@` only fires when followed by `word[` — bare mentions like `@john` and emails like `user@company.com` are never matched.
+
+---
+
+### Define a bridge
+ 
+```tsx
+import { defineBridge, B } from '@architprasar/md4ai/core';
+ 
+// Use B.type() to define a fluent, positional-aware schema
+const releaseBridge = defineBridge({
+  marker: 'release',
+  fields: [
+    B.string('name').describe('Package name (e.g., zod)'),
+    B.enum('status', ['live', 'beta', 'planned']).default('planned'),
+  ],
+  render: ({ name, status }) => (
+    <ReleaseBadge name={name} status={status} />
+  ),
+});
+```
+ 
+`defineBridge()` now accepts an array of **dTypes**. The order in the array defines the positional arguments.
+ 
+### Prompt generation
+ 
+md4ai uses a two-tier prompting system (**Protocol & Catalog**) to save tokens.
+- **Protocol**: One-time rules for universal bridge syntax (brackets, lists, spacing).
+- **Catalog**: A compressed manifest of available markers and their fields.
+ 
+Use `getBridgeProtocolPrompt()` to get the Tier 1 instructions, and the system handles the rest.
+
+### Register it
+
+Pass the same `bridges` array to both `parse` and `renderContent`:
+
+```tsx
+const bridges = [statusBridge];
+
+const nodes = parse(markdown, { bridges });
+const ui = renderContent(nodes, { bridges });
+```
+
+### System prompt hint
+
+Use `getPrompt()` when you want a full md4ai-aware prompt that includes built-in syntax guidance plus optional bridge hints. Use `getBridgePrompt()` when you only want the bridge-specific portion:
+
+```ts
+import { getPrompt, getBridgePrompt } from '@architprasar/md4ai/core';
+
+statusBridge.prompt
+// → 'Use @status[value] inline. Example: @status[success]'
+
+const systemPrompt = getPrompt({
+  bridges,
+  prefix: 'Write markdown and use md4ai syntax when it helps:',
+});
+
+const analyticsPrompt = getPrompt({
+  bridges,
+  includeBuiltins: ['callouts', 'charts', 'kpi', 'tables'],
+  includeBridges: ['status'],
+});
+
+const bridgeOnlyPrompt = getBridgePrompt(bridges, {
+  include: ['payment', 'status'],
+});
+```
+
+`getPrompt()` supports three modes:
+
+- `minimal` — smallest useful prompt, with strong fallback guidance and no long examples
+- `standard` — recommended default for most production surfaces
+- `withExamples` — higher-token mode with canonical examples for better syntax reliability
+
+Example:
+
+```ts
+const minimalPrompt = getPrompt({
+  mode: 'minimal',
+  includeBuiltins: ['kpi', 'tables', 'steps'],
+});
+
+const standardPrompt = getPrompt({
+  mode: 'standard',
+  bridges,
+  includeBuiltins: ['callouts', 'kpi', 'tables', 'steps'],
+});
+
+const examplePrompt = getPrompt({
+  mode: 'withExamples',
+  bridges,
+  includeBuiltins: ['steps', 'kpi', 'buttons'],
+  includeBridges: ['payment'],
+});
+```
+
+---
+
+### Built-in patterns
+
+| Pattern | Markdown | Parsed as |
+|---------|----------|-----------|
+| `scalar` | `@badge[success]` | `"success"` |
+| `array` | `@tags[React, Vue, Angular]` | `["React", "Vue", "Angular"]` |
+| `keyvalue` | `@kpi[value: $167k, label: Revenue]` | `{ value: "$167k", label: "Revenue" }` |
+| `range` | `@range[100 → 500]` | `{ min: "100", max: "500" }` |
+
+For custom parsing, pass a function:
+
+```ts
+defineBridge({
+  marker: 'progress',
+  pattern: (raw) => {
+    const [done, total] = raw.split('/').map(Number);
+    return { done, total, pct: Math.round((done / total) * 100) };
+  },
+  render: ({ done, total, pct }) => (
+    <div className="progress-bar">
+      <div style={{ width: `${pct}%` }} />
+      <span>{done}/{total}</span>
+    </div>
+  ),
+});
+```
+
+If you want to reuse the built-in parsers directly in your own helpers, `parseBridgeData()` is exported:
+
+```ts
+import { parseBridgeData } from '@architprasar/md4ai/core';
+
+const tags = parseBridgeData('array', 'React, Vue, Angular');
+// → ['React', 'Vue', 'Angular']
+```
+
+For stricter custom parsing with a safe fallback:
+
+```ts
+const progressBridge = defineBridge({
+  marker: 'progress',
+  pattern: (raw) => {
+    const [done, total] = raw.split('/').map(Number);
+    if (!Number.isFinite(done) || !Number.isFinite(total) || total <= 0) {
+      throw new Error('Invalid progress payload');
+    }
+    return { done, total, pct: Math.round((done / total) * 100) };
+  },
+  onParseError: (raw) => ({ done: 0, total: 0, pct: 0, raw }),
+  render: ({ pct }) => <span>{pct}%</span>,
+});
+```
+
+---
+
+### Host data and events
+
+Bridges can pull live data from your app and emit events back — the AI writes identifiers, your app resolves them.
+
+```tsx
+renderContent(nodes, {
+  bridges,
+
+  store: {
+    stock: ({ symbol }) => myStore.getPrice(symbol),
+    inventory: ({ sku, warehouse }) => api.getStock(sku, warehouse),
+  },
+
+  onEvent: (event, data) => {
+    if (event === 'buy') api.post('/orders', data);
+  },
+});
+```
+
+Inside the bridge:
+
+```tsx
+defineBridge({
+  marker: 'stock',
+  pattern: 'scalar',
+  render: (symbol, { query, emit }) => {
+    const price = query('stock', { symbol });
+    return (
+      <StockCard
+        symbol={symbol as string}
+        price={price as number}
+        onBuy={() => emit('buy', { symbol })}
+      />
+    );
+  },
+});
+```
+
+The markdown never contains real prices. The AI writes `@stock[AAPL]` — your store resolves it at render time.
+
+If a bridge renderer throws at render time, md4ai falls back to showing the original `@marker[data]` token instead of breaking the message tree.
+
+---
+
+## Themes
+
+Four built-in themes, each with light and dark variants. All use the same CSS variable system as shadcn — plug straight into your existing shadcn app.
+
+```tsx
+import { renderContent, themes } from '@architprasar/md4ai/react';
+import type { ThemeName } from '@architprasar/md4ai/react';
+
+renderContent(nodes, {
+  theme: themes.violet.dark,
+});
+```
+
+Available themes: `zinc` `violet` `rose` `blue`
+
+### Apply to the app shell too
+
+Use `tokensToCSSVars` to apply the same tokens as CSS variables on your root element — both the shell and the renderer inherit the same theme with zero duplication:
+
+```tsx
+function tokensToCSSVars(tokens: Record<string, string | undefined>) {
+  return {
+    '--bg':           tokens.bg,
+    '--surface':      tokens.surface,
+    '--accent':       tokens.accent,
+    '--text':         tokens.text,
+    // ...
+  } as React.CSSProperties;
+}
+
+const theme = themes[themeName][isDark ? 'dark' : 'light'];
+
+<div style={tokensToCSSVars(theme)}>
+  {renderContent(nodes, { theme })}
+</div>
+```
+
+### Custom theme
+
+Pass any subset — unset tokens fall back to the CSS variables already on the page:
+
+```tsx
+renderContent(nodes, {
+  theme: {
+    accent: '#7c3aed',
+    accentHover: '#6d28d9',
+    codeBg: '#1e1e2e',
+  },
+});
+```
+
+---
+
+## Syntax highlighting
+
+The library doesn't bundle a highlighter — pass any highlighter via the `highlight` option:
+
+```tsx
+import hljs from 'highlight.js';
+
+renderContent(nodes, {
+  highlight: (code, lang) => {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value;
+    }
+    return hljs.highlightAuto(code).value;
+  },
+});
+```
+
+Works with highlight.js, Shiki, Prism, lowlight — anything that returns an HTML string.
+
+---
+
+## Custom component overrides
+
+Replace any built-in renderer with your own component:
+
+```tsx
+import type { ComponentOverrides } from '@architprasar/md4ai/react';
+
+renderContent(nodes, {
+  components: {
+    // Leaf nodes receive raw props
+    chart: ({ chartType, data }) => <MyChart type={chartType} data={data} />,
+    video: ({ src }) => <MyPlayer src={src} />,
+
+    // Container nodes receive pre-rendered children
+    callout: ({ variant, children }) => (
+      <Alert variant={variant}>{children}</Alert>
+    ),
+    card: ({ title, children }) => (
+      <Card><CardHeader>{title}</CardHeader><CardBody>{children}</CardBody></Card>
+    ),
+  },
+});
+```
+
+All overridable keys: `paragraph` `heading` `code` `blockquote` `list` `table` `thematicBreak` `callout` `chart` `video` `button` `input` `card` `layout` `steps`
+
+---
+
+## API reference
+
+### `parse(markdown, options?)`
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `gfm` | `boolean` | `true` | GFM — tables, task lists, strikethrough |
+| `bridges` | `BridgeDefinition[]` | `[]` | Registers `@marker` tokens for the parser |
+
+Returns `IRNode[]` — plain serializable JSON, framework-agnostic.
+
+### `parseStreaming(markdown, options?)`
+
+Same signature as `parse`. Lenient about unclosed blocks at the end of the string — safe to call on every streaming chunk. Partial `steps` fences render immediately, with unfinished or unknown statuses falling back to `planned`.
+
+See [`docs/production.md`](./docs/production.md) for integration guidance around streaming updates and fallback expectations.
+
+### `renderContent(nodes, options?)`
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `theme` | `ThemeTokens` | CSS variable overrides scoped to the root wrapper |
+| `highlight` | `(code, lang) => string \| null` | Syntax highlighter for code blocks |
+| `components` | `ComponentOverrides` | Replace built-in renderers |
+| `bridges` | `BridgeDefinition[]` | Registered bridge renderers |
+| `store` | `Record<string, (params?) => unknown>` | Data resolvers for bridge `query()` |
+| `onEvent` | `(event, data?) => void` | Handler for bridge `emit()` |
+| `className` | `string` | Extra class on the root wrapper |
+
+See [`docs/production.md`](./docs/production.md) for production patterns using `theme`, `components`, `store`, and `onEvent` together.
+
+### `defineBridge(options)`
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `marker` | `string` | The `@marker` name — lowercase, letters and hyphens only |
+| `fields` | `BridgeField[]` | Fluent array of dTypes (e.g. `[B.string('id'), B.number('val')]`) |
+| `render` | `(data: T, ctx: BridgeRenderCtx) => ReactElement \| null` | Renders the component |
+| `prompt` | `string` | Overrides the auto-generated AI system prompt hint |
+| `onParseError` | `(raw, error) => T` | Safe fallback when a custom parser throws |
+
+### `themes`
+
+```ts
+import { themes } from '@architprasar/md4ai/react';
+// themes.zinc.light | themes.zinc.dark
+// themes.violet.light | themes.violet.dark
+// themes.rose.light | themes.rose.dark
+// themes.blue.light | themes.blue.dark
+```
+
+---
+
+## License
+
+MIT
+
+
+## architecture
+
+# Architecture Overview
+
+`md4ai` is a small pipeline with three layers:
+
+## Parsing
+
+`src/parse/` extends markdown into a stable intermediate representation. Plugins normalize callouts, fenced rich blocks, directives, and inline bridges before `rootToIR()` converts the mdast tree into library-owned node types.
+
+## Rendering
+
+`src/renderers/html/` turns IR nodes into React elements. `renderContent()` provides themed default components while still allowing host apps to override individual node renderers.
+
+The package now exposes that split directly:
+
+- `@architprasar/md4ai/core` for parsing, streaming, bridges, and IR types
+- `@architprasar/md4ai/react` for `renderContent()`, themes, and renderer override types
+- `@architprasar/md4ai` as the compatibility entry that re-exports both
+
+The renderer intentionally separates parsing from presentation:
+
+- Parsing produces plain IR nodes with no React dependency.
+- Rendering consumes that IR with theme tokens, component overrides, and bridge context.
+- Missing bridge renderers degrade visibly instead of breaking the whole render tree.
+
+## Streaming And Fallbacks
+
+`src/parse/streaming.ts` is a thin lenient wrapper around `parse()`. Before parsing, it auto-closes trailing fenced blocks and open directives so incomplete LLM output remains renderable.
+
+Current fallback behavior is deliberately simple:
+
+- Partial `chart` JSON becomes a `chart` node with `data: null`.
+- Partial `video` and `layout` fences still resolve into IR nodes.
+- Generic unfinished code fences are closed and preserved as normal code blocks.
+
+This keeps the parser deterministic while letting host apps update the same message repeatedly during token streaming.
+
+## Extension Points
+
+The public extension surface is small on purpose:
+
+- `defineBridge()` adds inline `@marker[data]` tokens with predictable parsing.
+- `renderContent(..., { components })` swaps renderer implementations without changing the parser.
+- `renderContent(..., { theme })` scopes CSS variable overrides to a single content tree.
+
+## Demo App
+
+`examples/demo/` is a consumer of the library, not the source of truth. It exists for manual QA, examples, and GitHub Pages deployment. Keep reusable library logic in `src/` and avoid letting the demo become the only place behavior is documented.
+
+
+## authoring
+
+# Bridge Authoring Guide
+
+Bridges are the heart of `md4ai`. They allow you to map custom inline syntax like `@marker[...]` to rich React components. 
+
+---
+
+## The dType Schema API
+
+Instead of plain objects, md4ai uses a fluent **dType** API to define bridge fields. This gives you:
+1. **Recursive Parsing**: Lists can contain typed items (e.g., `B.list('scores', B.number())`).
+2. **Smart Delimiters**: Lists automatically switch to `|` separators if the items contain commas.
+3. **Key Sanitization**: Named fields support quoted or spaced keys for maximum robustness.
+4. **AI Guidance**: Descriptions and constraints are automatically baked into the system prompt.
+
+### Basic Example
+
+```tsx
+import { defineBridge, B } from '@architprasar/md4ai/core';
+
+export const kpiBridge = defineBridge({
+  marker: 'kpi',
+  fields: [
+    B.string('label').describe('Metric name'),
+    B.string('value').describe('Current value'),
+    B.enum('trend', ['up', 'down', 'neutral']).default('neutral'),
+  ],
+  render: ({ label, value, trend }) => (
+    <div className={`kpi kpi--${trend}`}>
+      <h4>{label}</h4>
+      <p>{value}</p>
+    </div>
+  )
+});
+```
+
+---
+
+## Hybrid Syntax Rules
+
+Every bridge supports three ways of being invoked by the AI:
+
+1. **Positional**: `@kpi["Revenue", "$167k", up]`
+2. **Keyed**: `@kpi[label: "Revenue", value: "$167k", trend: up]`
+3. **Hybrid**: `@kpi["Revenue", "$167k", trend: up]`
+
+### The List Container (`|...|`)
+If a field is a list (`B.list()`), use `|...|` to wrap it.
+
+- **Simple List**: `@tags[|React, Vue, Angular|]` (uses `,` as separator)
+- **Complex List**: `@nodes[|id,Name,0,10|id2,Other,20,50|]` (uses `|` as separator because items contain commas)
+
+### Open Chars Resilience
+The parser is "Lenient by Design." It treats characters like `:` and `/` as part of the value unless they are at the top-level of a named field. This allows paths like `src/auth.ts:98` to work natively as "open chars" without mandatory quoting.
+
+---
+
+## Core dTypes
+
+| Type | Description | Recursive? |
+|---|---|---|
+| `B.string(name)` | A plain string. | Yes (cleaned) |
+| `B.number(name)` | Numeric value. | Yes (casted) |
+| `B.boolean(name)` | `true`/`false` or `yes`/`no`. | Yes (casted) |
+| `B.enum(name, options)` | Restricts AI values. | Yes |
+| `B.list(name, type)` | Smart-delimiter list. | **Recursive** |
+| `B.keyvalue(name)` | Dictionary / Map. | **Recursive** |
+
+### Field Attributes
+Every field supports chainable metadata:
+- `.describe(text)`: Base AI instruction.
+- `.default(val)`: Fallback value.
+- `.optional()`: Marks field as not required.
+- `.examples([val1, val2])`: Injects concrete examples into the prompt.
+- `.importance('high')`: Flags critical fields to the AI.
+
+---
+
+## Prompt Architecture
+
+md4ai uses a **Two-Tier** prompting system to keep token counts low.
+
+### 1. The Protocol (Tier 1)
+Teaches the AI the universal bridge syntax once. Use `getBridgeProtocolPrompt()`.
+> Use `@marker[pos0, pos1, key: value, |list|]`. Brackets `[...]` are mandatory. Use `|...|` for lists. No bridges in code blocks.
+
+### 2. The Catalog (Tier 2)
+A compressed manifest of your registered bridges. Use `getPrompt({ bridges, mode: 'minimal' })`.
+> - kpi: [label, value, trend: up|down|neutral]
+> - servicemap: [title, nodes: |node|, edges: |edge|]
+
+To generate these prompts:
+```ts
+import { getBridgeProtocolPrompt, getPrompt } from '@architprasar/md4ai/core';
+
+// 1. Get the universal protocol rules
+const protocol = getBridgeProtocolPrompt();
+
+// 2. Get the component manifest (Catalog)
+const catalog = getPrompt({ bridges, mode: 'minimal' });
+```
+
+
+## bridge-dtypes
+
+# Bridge Data Types (dTypes)
+
+dTypes are structured schema definitions for Bridge fields. Instead of plain-text descriptions, dTypes provide the parser with validation rules, casting logic, and precise AI prompting instructions.
+
+---
+
+## The Vision: Hybrid Syntax
+
+dTypes enable a hybrid positional/keyed syntax for bridges:
+
+```
+@marker[pos0, pos1, key: value, |list, item|]
+```
+
+- **Positional**: Maps to fields based on their index in the `fields` array.
+- **Named**: Maps to fields by key (e.g., `key: value`).
+- **Lists**: Uses the `|...|` container to allow nested commas. **Mandatory for multi-item lists** to prevent comma-clashing with top-level bridge fields. (e.g., `@marker[|a, b|, c]` is 2 fields; `@marker[a, b, c]` is 3 fields).
+
+---
+
+## Core dType Classes
+
+Each dType is a class or factory that produces a schema object.
+
+### `B.string()`
+A plain string field.
+- **`.max(n)`**: Injects "Max N characters" into the AI prompt.
+- **`.match(regex)`**: Runtime validation.
+- **`.prompt(hint)`**: Custom instruction for the AI (e.g., "Be enthusiastic").
+
+### `B.number()`
+Casts the raw string to a JavaScript number.
+- **`.min(n) / .max(n)`**: Constrains the AI and validates the output.
+- **`.int()`**: Forces integer parsing.
+
+### `B.enum(values: string[])`
+The most powerful tool for AI reliability.
+- **Prompt**: Injects "Must be one of: [values]" into the system prompt.
+- **Validation**: Reverts to default if the AI hallucinates a non-existent status.
+
+### `B.list(itemType)`
+Handles the `|...|` list syntax.
+- **`.separator(char)`**: Defaults to `,`.
+- **Parsing**: Automatically splits and casts items based on `itemType`.
+
+### `B.keyvalue()`
+Handles nested key-value pairs (dictionaries).
+- **Format**: `|key: value, key: value|`
+- **Parsing**: Casts to a JavaScript `Record<string, string>`.
+- **Prompt**: Injects "Format: |key:value, key:value|" instructions.
+
+### `B.boolean()`
+Handles `true`/`false`, `yes`/`no`, or `1`/`0`.
+
+---
+
+## Schema Attributes
+
+Every dType supports these chainable methods:
+
+| Method | Description |
+|---|---|
+| `.describe(text)` | The base description for the AI. |
+| `.default(val)` | Fallback if the field is missing or invalid. |
+| `.optional()` | Marks the field as not required. |
+| `.examples(list)` | Provides concrete examples for the AI prompt. |
+| `.format(template)` | Injects "Format: [template]" instructions. |
+| `.tone(type)` | Guidance: `concise` (under 5 words), `technical`, etc. |
+| `.importance(lvl)` | `high` (prefixed with REQUIRED) or `low`. |
+| `.prompt(text)` | Overrides all auto-generated instructions for this field. |
+
+---
+
+## Token Optimization (Prompt Shrinkage)
+
+To keep context windows clean, `getPrompt()` follows a hierarchy of brevity:
+
+1. **Self-Explanatory**: If a field is named `title`, `count`, `src`, or `href`, and has no `.describe()`, the prompt only includes the name.
+2. **Implicit Types**: `B.number()` adds `(num)`, `B.boolean()` adds `(bool)`.
+3. **Explicit Override**: `.prompt()` suppresses all other metadata for that field to allow hand-tuned, ultra-short instructions.
+
+---
+
+## Example: Advanced Bridge Definition
+
+```tsx
+import { defineBridge, B } from '@architprasar/md4ai/core';
+
+const kpiBridge = defineBridge({
+  marker: 'kpi',
+  fields: [
+    B.string('label').describe('Metric name'),
+    B.string('value').describe('Metric value'),
+    B.enum('trend', ['up', 'down', 'neutral']).default('neutral'),
+    B.list('tags', B.string()).optional(),
+    B.keyvalue('meta').optional()
+  ],
+  render: ({ label, value, trend, tags, meta }) => {
+    // fields are still accessible via an object in render
+  }
+});
+```
+
+### Supported Syntax based on this schema:
+- **Positional**: `@kpi["Revenue", "$167k"]`
+- **Mixed**: `@kpi["Revenue", "$167k", trend: up]`
+- **Full Hybrid**: `@kpi["Revenue", "$167k", |SaaS, Q1|, trend: up]`
+
+---
+
+## AI Prompt Architecture: Protocol & Catalog
+
+To minimize token usage, md4ai uses a two-tier prompting strategy:
+
+### Tier 1: The Bridge Protocol (Universal Rules)
+This is a one-time instruction that teaches the AI the universal syntax for all bridges. Use `getBridgeProtocolPrompt()`.
+
+> ### Universal Bridge Syntax (@marker)
+> Use @marker[data] to insert rich components. Brackets `[...]` are ALWAYS mandatory.
+> 1. **Fields**: You can use positional arguments, named keys, or a mix of both.
+>    - Positional: @marker["Value 1", "Value 2"]
+>    - Named: @marker[key1: "Value 1", key2: "Value 2"]
+>    - Hybrid: @marker["Value 1", key2: "Value 2"]
+> 2. **Lists**: Wrap multi-item lists in pipes to avoid comma clashing: @marker[|a, b, c|].
+> 3. **Smart Delimiters**: Inside |...|, use `|` as a separator if items contain commas (e.g., @marker[|id,label|id2,label|]).
+> 4. **Spacing**: Ensure a space precedes the `@` symbol if it is mid-sentence.
+> 5. **No-Code**: NEVER emit bridges inside markdown code blocks or backticks.
+
+### Tier 2: The Component Catalog (Component-specific)
+A compressed manifest of available markers and their expected fields. Use `getPrompt({ mode: 'minimal' })`.
+
+```
+- kpi: [label, value, change?, period?]
+- release: [name, status: live|beta|planned|blocked, owner?]
+- servicemap: [title, nodes: |node|, edges: |edge|]
+```
+
+---
+
+## Updated Prompt Generation Logic
+
+The `dType` system enables a "Compressed" mode for `getPrompt()`:
+
+1. **Protocol Block**: Explains the positional/keyed/list hybrid syntax.
+2. **Catalog Block**: A single line for each bridge: `marker: [positional_fields, optional_fields?, typed_fields: enum|values]`.
+
+This reduces the prompt cost of a bridge from ~60 tokens to **~12 tokens**.
+
+---
+
+## Positional Mapping Rules
+
+1.  **Lexer**: Split the `@marker[...]` payload by `,` while respecting `|...|` and `"..."`.
+2.  **Assignment**:
+    - If an item matches `key: value`, assign to the field with that name.
+    - Otherwise, assign to the next available field in the `fields` array that hasn't been filled yet.
+    - If a field in the array is marked `.optional()` and a positional argument doesn't match its type, it can be skipped (future-proofing).
+
+---
+
+## Parser Reliability & Performance
+
+The `Hybrid Lexer` is designed for high-performance production environments.
+
+### 1. Performance: O(n) Linear Scan
+The lexer uses a single-pass state machine (Iterative Scanning). It does not use expensive backtracking regex or recursive descent. It can process large bridge payloads (e.g. 10kb of data) in sub-millisecond time.
+
+### 2. Safety: Zero-Throw Guarantee
+The parser is "Lenient by Design." It will never throw an exception, regardless of how malformed the AI output is.
+- **Unclosed Pipes**: If `@marker[|a, b]` is encountered, the parser treats everything after `|` as the first item of the list.
+- **Unclosed Quotes**: Same as pipes; the quote remains open until the end of the string.
+- **Missing Keys**: `@marker[key:]` results in an empty string value for that key.
+
+### 3. Streaming-Safe
+Because it is a single-pass scanner, it can be called on every chunk of a streaming response. Partial markers at the very end of a stream are handled gracefully by the `parseStreaming` engine.
+
+
+
+
+## bridges
+
+# Bridge Reference
+
+Bridges are inline components written directly in markdown. The AI emits a compact `@marker[...]` token; md4ai renders it as a rich UI card.
+
+### Hybrid Syntax
+Every bridge supports positional arguments (defined by their schema order) and named arguments for optional overrides.
+
+```markdown
+@kpi["Revenue", "$167k", change: +18%, period: QoQ]
+```
+
+---
+
+## General purpose
+
+### `@kpi` — Metric card
+
+```markdown
+@kpi["Revenue", "$167k", change: +18%, period: QoQ]
+@kpi["Net Retention", "108%", change: "+4 pts"]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `label` | `string` | Metric name |
+| 1 | `value` | `string` | Current value |
+| - | `change` | `string` | Delta: `+18%`, `-7%` |
+| - | `period` | `string` | Context: `QoQ`, `YoY` |
+
+---
+
+### `@sparkline` — Inline trend line
+
+```markdown
+Checkout p95: @sparkline[|38, 41, 45, 49, 58, 62, 71|]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `items` | `list` | Numbers to plot |
+
+---
+
+### `@timeline` — Step timeline
+
+```markdown
+@timeline[|Discovery: done, Design: done, Build: active, Launch: planned|]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `steps` | `keyvalue` | `Step: status` pairs |
+
+---
+
+### `@release` — Release badge
+
+```markdown
+@release["zod v3.22", beta, eta: "rc.2", owner: Archit]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `name` | `string` | Package name |
+| 1 | `status` | `enum` | `live` `beta` `planned` `blocked` |
+| - | `eta` | `string` | Expected release |
+| - | `owner` | `string` | Responsible team |
+
+---
+
+### `@gauge` — Arc gauge
+
+```markdown
+@gauge["Checkout", 61, max: 100, unit: %]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `label` | `string` | Metric name |
+| 1 | `value` | `number` | Current value |
+| 2 | `max` | `number` | Scale maximum (default 100) |
+| - | `unit` | `string` | Suffix (`%`, `ms`) |
+
+---
+
+### `@signal` — Risk / decision signal
+
+```markdown
+@signal["SQL injection", critical, score: 9.4, note: "Parameterized query required."]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `title` | `string` | Finding title |
+| 1 | `tone` | `enum` | `critical` `warning` `positive` |
+| 2 | `score` | `number` | Risk 0–10 |
+| - | `trend` | `string` | `new` `resolved` `recurring` |
+
+---
+
+### `@fileheat` — File heatmap
+
+```markdown
+@fileheat["47 files", |src/auth.ts:98:modified, src/utils.ts:42:added|]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `title` | `string` | Label |
+| 1 | `files` | `list` | Entries: `path:intensity:type` |
+
+---
+
+### `@payment` — Upgrade card
+
+```markdown
+@payment["$79", "Pro Plan", desc: "Automatic merge blocking"]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `amount` | `string` | Price |
+| 1 | `plan` | `string` | Plan name |
+| - | `desc` | `string` | Description |
+
+---
+
+## AI agent surfaces
+
+### `@agent` — Agent run card
+
+```markdown
+@agent["CodeSentinel", "Security Reviewer", done, tools: |AST, Semgrep|]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `name` | `string` | Display name |
+| 1 | `role` | `string` | Purpose |
+| 2 | `status` | `enum` | `done` `active` `planned` `blocked` |
+
+---
+
+### `@command` — Control-room
+
+```markdown
+@command["Ops Console", Live, channels: |PagerDuty, Slack|]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `title` | `string` | Surface name |
+| 1 | `stage` | `string` | Current stage label |
+| - | `channels` | `list` | Notification channels |
+
+---
+
+## Trading / market data
+
+### `@ticker` — Market ticker
+
+```markdown
+@ticker["NVDA", "$984.22", move: "+3.8%", volume: 42.1M]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `symbol` | `string` | Ticker symbol |
+| 1 | `price` | `string` | Last price |
+
+---
+
+### `@position` — Portfolio position
+
+```markdown
+@position["NVDA", long, entry: "$902", size: "7.5%"]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `symbol` | `string` | Ticker symbol |
+| 1 | `side` | `enum` | `long` `short` |
+
+---
+
+### `@trade` — Trade decision
+
+```markdown
+@trade["Buy on pullback", window: "2 sessions", status: active]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `action` | `string` | Decision |
+| 1 | `status` | `enum` | `done` `active` `planned` `blocked` |
+
+---
+
+### `@candles` — Candlestick chart
+
+```markdown
+@candles["NVDA", thesis: "Support at $952", levels: |Support 952, Pivot 968|, candles: |2026-04-21:910:956:905:948:36|]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `symbol` | `string` | Ticker symbol |
+| - | `candles` | `list` | Entries: `date:open:high:low:close:volume` |
+
+---
+
+## Architecture / infra
+
+### `@servicemap` — Dependency graph
+
+```markdown
+@servicemap["Checkout v3", nodes: |api,API,0,80,active| , edges: |api>validator>validate|]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `title` | `string` | Graph title |
+| - | `nodes` | `list` | `id,label,x,y,status,meta` |
+| - | `edges` | `list` | `source>target>label` |
+
+---
+
+### `@pipelineflow` — Revenue board
+
+```markdown
+@pipelineflow["Q2 Pipeline", stages: |Sourced,$2.8M,182,done|]
+```
+
+| Pos | Field | Type | Description |
+|---|---|---|---|
+| 0 | `title` | `string` | Board title |
+| - | `stages` | `list` | `label,amount,count,status` |
+
+
+## production
+
+# Production Integration Guide
+
+This guide focuses on the operational side of `md4ai`: how to stream safely, layer in app theming, swap renderers, and keep bridge integrations predictable in production.
+
+## Streaming
+
+Use `parseStreaming()` on the full accumulated response text every time a new chunk arrives:
+
+```tsx
+import { parseStreaming } from '@architprasar/md4ai/core';
+import { renderContent } from '@architprasar/md4ai/react';
+
+function AssistantMessage({ text }: { text: string }) {
+  return renderContent(parseStreaming(text));
+}
+```
+
+What it guarantees today:
+
+- Unclosed backtick fences are auto-closed before parsing.
+- Unclosed `:::card`-style directives are auto-closed before parsing.
+- Incomplete `chart` fences resolve to a `chart` node with `data: null` so the UI can stay mounted.
+- Partial `video` and `layout` fences still parse into renderable nodes instead of throwing.
+
+Recommended app pattern:
+
+- Keep one source of truth for the full assistant message text.
+- Re-parse the full string on each chunk instead of trying to patch IR nodes manually.
+- Treat `parseStreaming()` output as transient UI state and re-run `parse()` on the final settled message if you need a canonical stored representation.
+
+## Theming
+
+`renderContent()` scopes theme tokens to the wrapper it returns, so the safest production path is to derive your app shell and `md4ai` from the same token object:
+
+```tsx
+import { renderContent, themes } from '@architprasar/md4ai/react';
+
+const theme = themes.blue.dark;
+
+export function Message({ nodes }: { nodes: ReturnType<typeof parseStreaming> }) {
+  return (
+    <section
+      style={{
+        background: theme.bg,
+        color: theme.text,
+        fontFamily: theme.font,
+      }}
+    >
+      {renderContent(nodes, { theme })}
+    </section>
+  );
+}
+```
+
+Guidelines:
+
+- Prefer passing a complete preset such as `themes.zinc.light` or `themes.blue.dark` for consistent color pairs.
+- Use partial overrides only for deliberate brand deltas.
+- If your host app already defines matching CSS variables, pass only the tokens you need to override locally.
+
+## Custom Components
+
+`components` lets you replace specific renderers without changing parsing:
+
+```tsx
+renderContent(nodes, {
+  components: {
+    callout: ({ variant, children }) => (
+      <Alert tone={variant}>{children}</Alert>
+    ),
+    chart: ({ chartType, data }) => (
+      <MyChart type={chartType} data={data} />
+    ),
+  },
+});
+```
+
+A few practical boundaries help keep this maintainable:
+
+- Use component overrides for presentation and host-specific wiring.
+- Leave markdown-to-IR decisions in `parse()` and `parseStreaming()`.
+- Keep overrides tolerant of partial streaming data, especially `chart`, which may receive `data: null`.
+
+## Bridges
+
+Bridges are the right layer when the AI should author structured inline intent but the app owns the real data and behavior.
+
+```tsx
+const userBridge = defineBridge({
+  marker: 'user',
+  pattern: 'scalar',
+  render: (id, { query, emit }) => {
+    const user = query('userById', { id });
+    return (
+      <button onClick={() => emit('open-user', { id })}>
+        {(user as { name?: string } | undefined)?.name ?? id}
+      </button>
+    );
+  },
+});
+```
+
+Production recommendations:
+
+- Register the same `bridges` array with both `parse()` and `renderContent()`.
+- Keep bridge payloads small and stable, like IDs, status values, or compact key/value metadata.
+- Resolve live data inside `query()` instead of asking the model to emit final business values.
+- Treat `emit()` as UI intent, then validate on the app side before performing side effects.
+- Keep marker names lowercase and predictable. `defineBridge()` rejects invalid names early.
+- For custom bridge parsers, either keep the parser tolerant or provide `onParseError` so bad model output degrades gracefully.
+- If a bridge renderer can fail due to missing host data, let it fail closed; md4ai will surface the original token instead of crashing the whole tree.
+
+## Fallback Expectations
+
+There are two useful fallback layers to design around:
+
+1. Parsing fallback: malformed rich blocks should still produce stable IR when possible, especially during streaming.
+2. Rendering fallback: if a bridge renderer is missing at render time, the inline source token is shown as plain visible text rather than crashing the tree.
+
+That means a good host integration should:
+
+- Be comfortable rendering partially complete content.
+- Avoid assuming every `chart` node has finalized data.
+- Avoid assuming every bridge token will have a matching renderer in every environment.
+
+## Validation
+
+When changing production-facing behavior, validate both of these:
+
+```bash
+npm run typecheck
+npm test
+```
+
+If the change affects host app styling or rich block presentation, also check the demo locally with `npm run dev`.
+
+

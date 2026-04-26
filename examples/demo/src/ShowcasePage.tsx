@@ -271,7 +271,7 @@ export default function ShowcasePage() {
       </div>
 
       <section style={{ padding: '0 2rem 1.4rem' }}>
-        <div style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0, 0.88fr) minmax(300px, 0.52fr)', gap: '1rem' }}>
+        <div className="showcase-info-grid" style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0, 0.88fr) minmax(300px, 0.52fr)', gap: '1rem' }}>
           <div style={{
             border: '1px solid var(--border)',
             background: 'var(--surface)',
@@ -353,6 +353,9 @@ export default function ShowcasePage() {
           nav { height: auto !important; padding-top: 1rem !important; padding-bottom: 1rem !important; align-items: center !important; gap: 1rem !important; flex-direction: column !important; }
           .hero-title { font-size: 2.2rem !important; }
           .showcase-stream { padding: 1.5rem 1.2rem !important; }
+        }
+        @media (max-width: 900px) {
+          .showcase-info-grid { grid-template-columns: 1fr !important; }
         }
         @media (max-width: 480px) {
           .hero-actions { flex-direction: column; align-items: stretch !important; }

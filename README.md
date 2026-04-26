@@ -111,6 +111,14 @@ import { renderContent, themes } from '@architprasar/md4ai/react';
 
 ---
 
+## Documentation
+Detailed documentation and interactive playground are available at [architprasar.github.io/md4ai](https://architprasar.github.io/md4ai).
+
+## Agent Support (MCP & llms.txt)
+md4ai is designed for AI native workflows.
+- **MCP Server**: Connect your agent with `npx -y github:architprasar/md4ai`.
+- **llms.txt**: Agents can find a concise map at [/llms.txt](https://architprasar.github.io/md4ai/llms.txt) or full context at [/llms-full.txt](https://architprasar.github.io/md4ai/llms-full.txt).
+
 ## Repository layout
 
 - `src/` — parser, IR, themes, bridges, and React renderer

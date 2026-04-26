@@ -51,14 +51,17 @@
   },
   "license": "MIT",
   "peerDependencies": {
+    "chart.js": ">=4",
     "react": ">=18",
-    "react-dom": ">=18",
-    "chart.js": ">=4"
+    "react-dom": ">=18"
   },
   "peerDependenciesMeta": {
-    "chart.js": { "optional": true }
+    "chart.js": {
+      "optional": true
+    }
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "remark-directive": "^3.0.1",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
@@ -70,6 +73,7 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "chart.js": "^4.4.9",
+    "js-tiktoken": "^1.0.21",
     "typescript": "^5.8.3",
     "vite": "^6.3.4",
     "vite-plugin-dts": "^4.5.4"
