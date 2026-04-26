@@ -1,6 +1,6 @@
 {
   "name": "@architprasar/md4ai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI-friendly rich markdown renderer — extended markdown syntax that renders to interactive UI",
   "type": "module",
   "main": "./dist/md4ai.umd.cjs",
@@ -22,14 +22,19 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "mcp-server.mjs"
   ],
+  "bin": {
+    "md4ai-mcp": "./mcp-server.mjs"
+  },
   "scripts": {
     "build": "vite build && tsc -p tsconfig.runtime.json && tsc --emitDeclarationOnly --declarationDir dist",
     "build:demo": "npm --prefix examples/demo run build",
     "dev": "cd examples/demo && npm run dev",
     "test": "tsc -p tsconfig.test.json && node --test test/*.test.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check": "node scripts/check.mjs"
   },
   "keywords": [
     "markdown",
